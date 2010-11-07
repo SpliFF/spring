@@ -28,7 +28,7 @@ C3DModelLoader* modelParser = NULL;
 // C3DModelLoader
 //
 
-C3DModelLoader::C3DModelLoader(void)
+C3DModelLoader::C3DModelLoader()
 {
 	// file-extension should be lowercase
 	AddParser("3do", new C3DOParser());
@@ -55,7 +55,7 @@ C3DModelLoader::C3DModelLoader(void)
 }
 
 
-C3DModelLoader::~C3DModelLoader(void)
+C3DModelLoader::~C3DModelLoader()
 {
 	// delete model cache
 	std::map<std::string, S3DModel*>::iterator ci;
@@ -225,12 +225,9 @@ void C3DModelLoader::CreateLocalModelPieces(S3DModelPiece* piece, LocalModel* lm
 	lmp.displist  =  piece->displist;
 	lmp.visible   = !piece->isEmpty;
 	lmp.updated   =  false;
-	lmp.pos       =  piece->pos;
-	lmp.rot       =  piece->rot;
-	lmp.scale     =  piece->scale;
-
-	//logOutput.Print("Create CollisionVolume");
-	lmp.colvol    = new CollisionVolume(piece->colvol);
+	lmp.pos       =  piece->offset;
+	lmp.rot       =  ZeroVector;
+	lmp.colvol    =  new CollisionVolume(piece->colvol);
 
 	//logOutput.Print("Setup childs (childs %d)", piece->childs.size());
 	lmp.childs.reserve(piece->childs.size());

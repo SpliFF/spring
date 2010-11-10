@@ -202,7 +202,7 @@ LocalModel* C3DModelLoader::CreateLocalModel(S3DModel* model)
 		logOutput.Print("Adding object %d", i);
 		lmodel->pieces.push_back(new LocalModelPiece);
 	}
-	lmodel->pieces[0]->parent = NULL;
+	lmodel->GetRoot()->parent = NULL;
 
 	int piecenum = 0;
 	CreateLocalModelPieces(model->rootobject, lmodel, &piecenum);
@@ -224,7 +224,6 @@ void C3DModelLoader::CreateLocalModelPieces(S3DModelPiece* piece, LocalModel* lm
 	lmp.type      =  piece->type;
 	lmp.displist  =  piece->displist;
 	lmp.visible   = !piece->isEmpty;
-	lmp.updated   =  false;
 	lmp.pos       =  piece->offset;
 	lmp.rot       =  ZeroVector;
 	lmp.colvol    =  new CollisionVolume(piece->colvol);

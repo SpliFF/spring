@@ -20,7 +20,6 @@ public:
 	@param mapName human readable mapname e.g. DeltaSiegeDry
 	*/
 	CMapInfo(const std::string& mapInfoFile, const std::string& mapName);
-	void Load(); // fill in infos
 	~CMapInfo();
 
 	/* The settings are just public members because:
@@ -54,17 +53,16 @@ public:
 
 	/** Global settings, ie. from "MAP" section. */
 	struct map_t {
-		std::string name;      ///< The filename as passed to the constructor.
-		std::string humanName; ///< "MAP\\Description"
+		std::string name;        ///< The filename as passed to the constructor.
+		std::string description; ///< "MAP\\Description"
 		std::string author;
-		float hardness;        ///< "MAP\\MapHardness"
+		float hardness;          ///< "MAP\\MapHardness"
 		bool  notDeformable;
 		/** Stores the gravity as a negative number in units/frame^2
 		    (NOT positive units/second^2 as in the mapfile) */
 		float gravity;
 		float tidalStrength;
-		/// what metal value 255 in the metal map is worth
-		float maxMetal;
+		float maxMetal;        ///< what metal value 255 in the metal map is worth
 		float extractorRadius; ///< extraction radius for mines
 		bool  voidWater;
 	} map;

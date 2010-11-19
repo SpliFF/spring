@@ -4,14 +4,15 @@
 #define __BITMAP_H__
 
 #include <string>
-// We can not include gl.h here, cause sometimes glew.h has to be included
-// before gl.h, so we have to do this in before including this header.
-//#include <GL/gl.h> // for GLuint, GLenum
-
 #ifndef BITMAP_NO_OPENGL
-#include "nv_dds.h"
+	#include "nv_dds.h"
 #endif // !BITMAP_NO_OPENGL
-#include "float3.h"
+#include "System/float3.h"
+#include "System/Color.h"
+
+
+struct SDL_Surface;
+
 
 class CBitmap  
 {
@@ -23,24 +24,42 @@ public:
 
 	virtual ~CBitmap();
 
-	void Alloc(int w,int h);
-	bool Load(std::string const& filename, unsigned char defaultAlpha=255);
+	void Alloc(int w, int h);
+	bool Load(std::string const& filename, unsigned char defaultAlpha = 255);
 	bool LoadGrayscale(std::string const& filename);
-	bool Save(std::string const& filename, bool opaque = true);
+	bool Save(std::string const& filename, bool opaque = true) const;
 
 #ifndef BITMAP_NO_OPENGL
-	const GLuint CreateTexture(bool mipmaps=false);
-	const GLuint CreateDDSTexture(GLuint texID = 0);
+	const GLuint CreateTexture(bool mipmaps = false) const;
+	const GLuint CreateDDSTexture(GLuint texID = 0) const;
+#else  // !BITMAP_NO_OPENGL
+	const unsigned int CreateTexture(bool mipmaps = false) const;
+	const unsigned int CreateDDSTexture(unsigned int texID = 0) const;
 #endif // !BITMAP_NO_OPENGL
 
-	void CreateAlpha(unsigned char red,unsigned char green,unsigned char blue);
-	void SetTransparent(unsigned char red, unsigned char green, unsigned char blue);
+	void CreateAlpha(unsigned char red, unsigned char green, unsigned char blue);
+	void SetTransparent(const SColor& c, const SColor& trans = SColor(0,0,0,0));
 
 	void Renormalize(float3 newCol);
 	void Blur(int iterations = 1, float weight = 1.0f);
 
-	CBitmap GetRegion(int startx, int starty, int width, int height);
-	CBitmap CreateMipmapLevel(void);
+	CBitmap GetRegion(int startx, int starty, int width, int height) const;
+	void CopySubImage(const CBitmap& src, unsigned int x, unsigned int y);
+
+	/**
+	 * Allocates a new SDL_Surface, and feeds it with the data of this bitmap.
+	 * @param newPixelData
+	 *        if false, the returned struct will have a pointer
+	 *        to the internal pixel data (mem), which means it is only valid
+	 *        as long as mem is not freed, which should only happen
+	 *        when the this bitmap is deleted.
+	 *        If true, an array is allocated with new, and has to be deleted
+	 *        after SDL_FreeSurface() is called.
+	 * Note:
+	 * - You have to free the surface with SDL_FreeSurface(surface)
+	 *   if you do not need it anymore!
+	 */
+	SDL_Surface* CreateSDLSurface(bool newPixelData = false) const;
 
 	unsigned char* mem;
 	int xsize;
@@ -61,7 +80,7 @@ public:
 #endif // !BITMAP_NO_OPENGL
 
 public:
-	CBitmap CreateRescaled(int newx, int newy);
+	CBitmap CreateRescaled(int newx, int newy) const;
 	void ReverseYAxis();
 	void InvertColors();
 	void InvertAlpha();

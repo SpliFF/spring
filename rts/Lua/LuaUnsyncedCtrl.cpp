@@ -44,6 +44,8 @@
 #include "Rendering/GL/myGL.h"
 #include "Rendering/IconHandler.h"
 #include "Rendering/InMapDraw.h"
+#include "Rendering/WindowManagerHelper.h"
+#include "Rendering/Textures/Bitmap.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitDefHandler.h"
@@ -179,6 +181,8 @@ bool LuaUnsyncedCtrl::PushEntries(lua_State* L)
 	REGISTER_LUA_CFUNC(SetLosViewColors);
 
 	REGISTER_LUA_CFUNC(Restart);
+	REGISTER_LUA_CFUNC(SetWMIcon);
+	REGISTER_LUA_CFUNC(SetWMCaption);
 
 	REGISTER_LUA_CFUNC(SetUnitDefIcon);
 	REGISTER_LUA_CFUNC(SetUnitDefImage);
@@ -863,10 +867,6 @@ int LuaUnsyncedCtrl::SetTeamColor(lua_State* L)
 
 int LuaUnsyncedCtrl::AssignMouseCursor(lua_State* L)
 {
-	if (!CLuaHandle::GetActiveHandle()->GetUserMode()) {
-		return 0;
-	}
-
 	const int args = lua_gettop(L); // number of arguments
 	if ((args < 2) || !lua_isstring(L, 1) || !lua_isstring(L, 2)) {
 		luaL_error(L, "Incorrect arguments to AssignMouseCursor()");
@@ -887,22 +887,19 @@ int LuaUnsyncedCtrl::AssignMouseCursor(lua_State* L)
 		}
 	}
 
-	if (mouse->AssignMouseCursor(cmdName, fileName, hotSpot, overwrite)) {
-		lua_pushboolean(L, true);
-	} else {
-		lua_pushboolean(L, false);
+	const bool worked = mouse->AssignMouseCursor(cmdName, fileName, hotSpot, overwrite);
+
+	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
+		lua_pushboolean(L, worked);
+		return 1;
 	}
 
-	return 1;
+	return 0;
 }
 
 
 int LuaUnsyncedCtrl::ReplaceMouseCursor(lua_State* L)
 {
-	if (!CLuaHandle::GetActiveHandle()->GetUserMode()) {
-		return 0;
-	}
-
 	const int args = lua_gettop(L); // number of arguments
 	if ((args < 1) || !lua_isstring(L, 1) || !lua_isstring(L, 2)) {
 		luaL_error(L, "Incorrect arguments to ReplaceMouseCursor()");
@@ -918,9 +915,14 @@ int LuaUnsyncedCtrl::ReplaceMouseCursor(lua_State* L)
 		}
 	}
 
-	lua_pushboolean(L, mouse->ReplaceMouseCursor(oldName, newName, hotSpot));
+	const bool worked = mouse->ReplaceMouseCursor(oldName, newName, hotSpot);
 
-	return 1;
+	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
+		lua_pushboolean(L, worked);
+		return 1;
+	}
+
+	return 0;
 }
 
 /******************************************************************************/
@@ -1648,6 +1650,40 @@ int LuaUnsyncedCtrl::Restart(lua_State* L)
 
 	lua_pushboolean(L, execOk);
 	return 1;
+}
+
+int LuaUnsyncedCtrl::SetWMIcon(lua_State* L)
+{
+	const int args = lua_gettop(L); // number of arguments
+	if ((args != 1) || !lua_isstring(L, 1)) {
+		luaL_error(L, "Incorrect arguments to SetWMIcon(iconFileName)");
+	}
+
+	const std::string iconFileName = luaL_checkstring(L, 1);
+
+	CBitmap iconTexture;
+	const bool loaded = iconTexture.Load(iconFileName);
+	if (loaded) {
+		WindowManagerHelper::SetIcon(&iconTexture);
+	} else {
+		luaL_error(L, "Failed to load image from file \"%s\"", iconFileName.c_str());
+	}
+
+	return 0;
+}
+
+int LuaUnsyncedCtrl::SetWMCaption(lua_State* L)
+{
+	const int args = lua_gettop(L); // number of arguments
+	if ((args != 1) || !lua_isstring(L, 1)) {
+		luaL_error(L, "Incorrect arguments to SetWMCaption(caption)");
+	}
+
+	const std::string caption = luaL_checkstring(L, 1);
+
+	WindowManagerHelper::SetCaption(caption);
+
+	return 0;
 }
 
 /******************************************************************************/

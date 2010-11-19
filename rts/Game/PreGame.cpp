@@ -7,44 +7,42 @@
 #include <SDL_timer.h>
 #include <set>
 #include <cfloat>
-
 #include "mmgr.h"
 
 #include "PreGame.h"
-#include "Game.h"
-#include "GameVersion.h"
-#include "Player.h"
-#include "Sim/Misc/TeamHandler.h"
+
+#include "ClientSetup.h"
 #include "FPUCheck.h"
+#include "Game.h"
+#include "GameData.h"
 #include "GameServer.h"
 #include "GameSetup.h"
-#include "ClientSetup.h"
-#include "GameData.h"
+#include "GameVersion.h"
 #include "LoadScreen.h"
+#include "Player.h"
+#include "PlayerHandler.h"
+#include "TimeProfiler.h"
+#include "UI/InfoConsole.h"
+
+#include "aGui/Gui.h"
+#include "ExternalAI/SkirmishAIHandler.h"
+#include "Rendering/glFont.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Misc/GlobalConstants.h"
-#include "ExternalAI/SkirmishAIHandler.h"
-#include "NetProtocol.h"
-#include "Net/RawPacket.h"
-#include "LoadSave/DemoRecorder.h"
-#include "LoadSave/DemoReader.h"
-#include "LoadSave/LoadSaveHandler.h"
-#include "TdfParser.h"
-#include "FileSystem/ArchiveScanner.h"
-#include "FileSystem/FileHandler.h"
-#include "FileSystem/VFSHandler.h"
-#include "Sound/ISound.h"
-#include "Sound/IMusicChannel.h"
-#include "Map/MapInfo.h"
-#include "ConfigHandler.h"
-#include "FileSystem/FileSystem.h"
-#include "Rendering/glFont.h"
-#include "UI/InfoConsole.h"
-#include "aGui/Gui.h"
-#include "Exceptions.h"
-#include "TimeProfiler.h"
-#include "Net/UnpackPacket.h"
-#include "PlayerHandler.h"
+#include "Sim/Misc/TeamHandler.h"
+#include "System/ConfigHandler.h"
+#include "System/Exceptions.h"
+#include "System/NetProtocol.h"
+#include "System/TdfParser.h"
+#include "System/FileSystem/ArchiveScanner.h"
+#include "System/FileSystem/FileHandler.h"
+#include "System/FileSystem/FileSystem.h"
+#include "System/FileSystem/VFSHandler.h"
+#include "System/LoadSave/DemoRecorder.h"
+#include "System/LoadSave/DemoReader.h"
+#include "System/LoadSave/LoadSaveHandler.h"
+#include "System/Net/RawPacket.h"
+#include "System/Net/UnpackPacket.h"
 
 CPreGame* pregame = NULL;
 using netcode::RawPacket;
@@ -69,7 +67,6 @@ CPreGame::CPreGame(const ClientSetup* setup) :
 	{
 		net->InitLocalClient();
 	}
-	ISound::Initialize(); // should have finished until server response arrives
 }
 
 
@@ -77,6 +74,8 @@ CPreGame::~CPreGame()
 {
 	// don't delete infoconsole, its beeing reused by CGame
 	agui::gui->Draw(); // delete leftover gui elements (remove once the gui is drawn ingame)
+
+	pregame = NULL;
 }
 
 void CPreGame::LoadSetupscript(const std::string& script)
@@ -184,14 +183,14 @@ void CPreGame::StartServer(const std::string& setupscript)
 	// (Which is OK, since unitsync does not have map options available either.)
 	setup->LoadStartPositions();
 
-	const std::string modArchive = archiveScanner->ArchiveFromName(setup->modName);
+	const std::string& modArchive = archiveScanner->ArchiveFromName(setup->modName);
+	const std::string& mapArchive = archiveScanner->ArchiveFromName(setup->mapName);
 	startupData->SetModChecksum(archiveScanner->GetArchiveCompleteChecksum(modArchive));
-	const std::string mapArchive = archiveScanner->ArchiveFromName(setup->mapName);
 	startupData->SetMapChecksum(archiveScanner->GetArchiveCompleteChecksum(mapArchive));
 
 	good_fpu_control_registers("before CGameServer creation");
 	startupData->SetSetup(setup->gameSetupText);
-	gameServer = new CGameServer(settings->hostport, (setup->playerStartingData.size() == 1), startupData, setup);
+	gameServer = new CGameServer(settings->hostport, startupData, setup);
 	delete startupData;
 	gameServer->AddLocalClient(settings->myPlayerName, SpringVersion::GetFull());
 	good_fpu_control_registers("after CGameServer creation");
@@ -313,6 +312,7 @@ void CPreGame::ReadDataFromDemo(const std::string& demoName)
 			tgame->AddPair("MapName", demoScript->mapName);
 			tgame->AddPair("Gametype", demoScript->modName);
 			tgame->AddPair("Demofile", demoName);
+			tgame->AddPair("OnlyLocal", 1);
 
 			for (std::map<std::string, TdfParser::TdfSection*>::iterator it = tgame->sections.begin(); it != tgame->sections.end(); ++it)
 			{
@@ -361,9 +361,11 @@ void CPreGame::ReadDataFromDemo(const std::string& demoName)
 			}
 			logOutput.Print("Starting GameServer");
 			good_fpu_control_registers("before CGameServer creation");
-			gameServer = new CGameServer(settings->hostport, true, data, tempSetup);
+
+			gameServer = new CGameServer(settings->hostport, data, tempSetup);
 			gameServer->AddLocalClient(settings->myPlayerName, SpringVersion::GetFull());
 			delete data;
+
 			good_fpu_control_registers("after CGameServer creation");
 			logOutput.Print("GameServer started");
 			break;
@@ -424,24 +426,19 @@ void CPreGame::GameDataReceived(boost::shared_ptr<const netcode::RawPacket> pack
 	}
 
 	gs->SetRandSeed(gameData->GetRandomSeed(), true);
-	LogObject() << "Using map " << gameSetup->mapName << "\n";
+	LogObject() << "Using map: " << gameSetup->mapName << "\n";
 
-	if (net && net->GetDemoRecorder()) {
-		net->GetDemoRecorder()->SetName(gameSetup->mapName, gameSetup->modName);
-		LogObject() << "Recording demo " << net->GetDemoRecorder()->GetName() << "\n";
-	}
 	vfsHandler->AddArchiveWithDeps(gameSetup->mapName, false);
 	archiveScanner->CheckArchive(gameSetup->mapName, gameData->GetMapChecksum());
 
-	// This MUST be loaded this late, since this executes map Lua code which
-	// may call Spring.GetMapOptions(), which NEEDS gameSetup to be set!
-	if (!mapInfo) {
-		mapInfo = new CMapInfo(gameSetup->MapFile(), gameSetup->mapName);
-	}
-
-	LogObject() << "Using mod " << gameSetup->modName << "\n";
+	LogObject() << "Using mod: " << gameSetup->modName << "\n";
 	vfsHandler->AddArchiveWithDeps(gameSetup->modName, false);
 	modArchive = archiveScanner->ArchiveFromName(gameSetup->modName);
-	LogObject() << "Using mod archive " << modArchive << "\n";
+	LogObject() << "Using mod archive: " << modArchive << "\n";
 	archiveScanner->CheckArchive(modArchive, gameData->GetModChecksum());
+
+	if (net && net->GetDemoRecorder()) {
+		net->GetDemoRecorder()->SetName(gameSetup->mapName, gameSetup->modName);
+		LogObject() << "Recording Demo to " << net->GetDemoRecorder()->GetName() << "\n";
+	}
 }

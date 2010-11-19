@@ -116,7 +116,7 @@ void CFactory::Update()
 
 		if (solidObj == NULL || (dynamic_cast<const CUnit*>(solidObj) == this)) {
 			quedBuild = false;
-			CUnit* b = unitLoader.LoadUnit(nextBuild, buildPos + float3(0.01f, 0.01f, 0.01f), team,
+			CUnit* b = unitLoader->LoadUnit(nextBuild, buildPos + float3(0.01f, 0.01f, 0.01f), team,
 											true, buildFacing, this);
 
 			if (!unitDef->canBeAssisted) {
@@ -243,7 +243,7 @@ void CFactory::StopBuild()
 			AddMetal(curBuild->metalCost * curBuild->buildProgress, false);
 			curBuild->KillUnit(false, true, NULL);
 		}
-		DeleteDeathDependence(curBuild);
+		DeleteDeathDependence(curBuild, DEPENDENCE_BUILD);
 	}
 	curBuild = 0;
 	quedBuild = false;
@@ -298,47 +298,40 @@ void CFactory::AssignBuildeeOrders(CUnit* unit) {
 		return;
 	}
 
-	// HACK: when a factory has a rallypoint set far enough away
-	// to trigger the non-admissable path estimators, we want to
-	// avoid units getting stuck inside by issuing them an extra
-	// move-order. However, this order can *itself* cause the PF
-	// system to consider the path blocked if the extra waypoint
-	// falls within the factory's confines, so use a wide berth.
-	const float xs = unitDef->xsize * SQUARE_SIZE * 0.5f;
-	const float zs = unitDef->zsize * SQUARE_SIZE * 0.5f;
-
-	float tmpDst = 2.0f;
-	float3 tmpPos = unit->pos + (frontdir * this->radius * tmpDst);
-
-	if (buildFacing == FACING_NORTH || buildFacing == FACING_SOUTH) {
-		while ((tmpPos.z >= unit->pos.z - zs && tmpPos.z <= unit->pos.z + zs)) {
-			tmpDst += 0.5f;
-			tmpPos = unit->pos + (frontdir * this->radius * tmpDst);
-		}
-	} else {
-		while ((tmpPos.x >= unit->pos.x - xs && tmpPos.x <= unit->pos.x + xs)) {
-			tmpDst += 0.5f;
-			tmpPos = unit->pos + (frontdir * this->radius * tmpDst);
-		}
-	}
-
 	Command c;
-		c.id = CMD_MOVE;
+	c.id = CMD_MOVE;
+
+	if (!unit->unitDef->canfly) {
+
+		// HACK: when a factory has a rallypoint set far enough away
+		// to trigger the non-admissable path estimators, we want to
+		// avoid units getting stuck inside by issuing them an extra
+		// move-order. However, this order can *itself* cause the PF
+		// system to consider the path blocked if the extra waypoint
+		// falls within the factory's confines, so use a wide berth.
+		const float xs = unitDef->xsize * SQUARE_SIZE * 0.5f;
+		const float zs = unitDef->zsize * SQUARE_SIZE * 0.5f;
+
+		float tmpDst = 2.0f;
+		float3 tmpPos = unit->pos + (frontdir * this->radius * tmpDst);
+
+		if (buildFacing == FACING_NORTH || buildFacing == FACING_SOUTH) {
+			while ((tmpPos.z >= unit->pos.z - zs && tmpPos.z <= unit->pos.z + zs)) {
+				tmpDst += 0.5f;
+				tmpPos = unit->pos + (frontdir * this->radius * tmpDst);
+			}
+		} else {
+			while ((tmpPos.x >= unit->pos.x - xs && tmpPos.x <= unit->pos.x + xs)) {
+				tmpDst += 0.5f;
+				tmpPos = unit->pos + (frontdir * this->radius * tmpDst);
+			}
+		}
+
 		c.params.push_back(tmpPos.x);
 		c.params.push_back(tmpPos.y);
 		c.params.push_back(tmpPos.z);
-	unit->commandAI->GiveCommand(c);
-
-	/*
-	const float3 tmpWaypoint = curBuild->pos + frontdir * (this->radius * 2.5f);
-
-	Command c;
-		c.id = CMD_MOVE;
-		c.params.push_back(tmpWaypoint.x);
-		c.params.push_back(tmpWaypoint.y);
-		c.params.push_back(tmpWaypoint.z);
-	unit->commandAI->GiveCommand(c);
-	*/
+		unit->commandAI->GiveCommand(c);
+	}
 
 	for (CCommandQueue::const_iterator ci = newUnitCmds.begin(); ci != newUnitCmds.end(); ++ci) {
 		c = *ci;

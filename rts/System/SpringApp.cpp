@@ -20,8 +20,9 @@
 
 #include "aGui/Gui.h"
 #include "ExternalAI/IAILibraryManager.h"
-#include "Game/GameVersion.h"
+#include "Game/GameServer.h"
 #include "Game/GameSetup.h"
+#include "Game/GameVersion.h"
 #include "Game/ClientSetup.h"
 #include "Game/GameController.h"
 #include "Game/PreGame.h"
@@ -38,6 +39,8 @@
 #include "Rendering/glFont.h"
 #include "Rendering/GLContext.h"
 #include "Rendering/VerticalSync.h"
+#include "Rendering/WindowManagerHelper.h"
+#include "Rendering/Textures/Bitmap.h"
 #include "Rendering/Textures/TAPalette.h"
 #include "Rendering/Textures/NamedTextures.h"
 #include "Rendering/Textures/TextureAtlas.h"
@@ -116,6 +119,7 @@ SpringApp::SpringApp()
 	depthBufferBits = 24;
 	windowState = 0;
 	windowPosX = windowPosY = 0;
+	ogc = NULL;
 }
 
 /**
@@ -126,7 +130,7 @@ SpringApp::~SpringApp()
 	delete cmdline;
 	delete[] keys;
 
-	creg::System::FreeClasses ();
+	creg::System::FreeClasses();
 }
 
 /**
@@ -218,6 +222,8 @@ bool SpringApp::Initialize()
 	// Initialize Lua GL
 	LuaOpenGL::Init();
 
+	// Sound
+	ISound::Initialize();
 
 	SetProcessAffinity(configHandler->Get("SetCoreAffinity", 0));
 
@@ -320,7 +326,8 @@ static bool MultisampleTest(void)
  */
 static bool MultisampleVerify(void)
 {
-	GLint buffers, samples;
+	GLint buffers = 0;
+	GLint samples = 0;
 	glGetIntegerv(GL_SAMPLE_BUFFERS_ARB, &buffers);
 	glGetIntegerv(GL_SAMPLES_ARB, &samples);
 	if (buffers && samples) {
@@ -350,9 +357,7 @@ bool SpringApp::InitWindow(const char* title)
 
 	PrintAvailableResolutions();
 
-	// Sets window manager properties
-	SDL_WM_SetIcon(SDL_LoadBMP("spring.bmp"),NULL);
-	SDL_WM_SetCaption(title, title);
+	WindowManagerHelper::SetCaption(title);
 
 	if (!SetSDLVideoMode()) {
 		logOutput.Print("Failed to set SDL video mode: %s", SDL_GetError());
@@ -395,7 +400,12 @@ bool SpringApp::SetSDLVideoMode()
 
 	FSAA = MultisampleTest();
 
-	SDL_Surface *screen = SDL_SetVideoMode(screenWidth, screenHeight, 32, sdlflags);
+	// screen will be freed by SDL_Quit()
+	// from: http://sdl.beuc.net/sdl.wiki/SDL_SetVideoMode
+	// Note 3: This function should be called in the main thread of your application.
+	// User note 1: Some have found that enabling OpenGL attributes like SDL_GL_STENCIL_SIZE (the stencil buffer size) before the video mode has been set causes the application to simply ignore those attributes, while enabling attributes after the video mode has been set works fine.
+	// User note 2: Also note that, in Windows, setting the video mode resets the current OpenGL context. You must execute again the OpenGL initialization code (set the clear color or the shade model, or reload textures, for example) after calling SDL_SetVideoMode. In Linux, however, it works fine, and the initialization code only needs to be executed after the first call to SDL_SetVideoMode (although there is no harm in executing the initialization code after each call to SDL_SetVideoMode, for example for a multiplatform application). 
+	SDL_Surface* screen = SDL_SetVideoMode(screenWidth, screenHeight, 32, sdlflags);
 	if (!screen) {
 		char buf[1024];
 		SNPRINTF(buf, sizeof(buf), "Could not set video mode:\n%s", SDL_GetError());
@@ -1018,11 +1028,7 @@ int SpringApp::Sim()
 
 		if(GML_SHARE_LISTS)
 			ogc->WorkerThreadFree();
-	} catch(opengl_error &e) {
-		Threading::SetThreadError(e.what());
-		Threading::GetMainThread()->interrupt();
-		return 0;
-	}
+	} CATCH_SPRING_ERRORS
 
 	return 1;
 }
@@ -1185,6 +1191,7 @@ int SpringApp::Run(int argc, char *argv[])
 		{
 			SCOPED_TIMER("Input");
 			SDL_Event event;
+
 			while (SDL_PollEvent(&event)) {
 				input.PushEvent(event);
 			}
@@ -1197,11 +1204,13 @@ int SpringApp::Run(int argc, char *argv[])
 			if (!Update())
 				break;
 		} catch (content_error &e) {
+			//FIXME should this really be in here and not the crashhandler???
 			LogObject() << "Caught content exception: " << e.what() << "\n";
 			handleerror(NULL, e.what(), "Content error", MBF_OK | MBF_EXCL);
 		}
 	}
 
+	//FIXME this doesn't gets called when the above content_error is catched!!!!!
 #ifdef USE_GML
 	#if GML_ENABLE_SIM
 	gmlKeepRunning=0; // wait for sim to finish
@@ -1228,10 +1237,12 @@ int SpringApp::Run(int argc, char *argv[])
  */
 void SpringApp::Shutdown()
 {
-	delete pregame;	//in case we exit during init
-	CLoadScreen::DeleteInstance(); // FIXME? (see ~CGame)
+	delete pregame;
 	delete game;
+	delete gameServer;
 	delete gameSetup;
+	CLoadScreen::DeleteInstance();
+	ISound::Shutdown();
 	delete font;
 	delete smallFont;
 	CNamedTextures::Kill();

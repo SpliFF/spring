@@ -28,31 +28,15 @@ class LuaTable;
 typedef std::map<std::string, S3DModelPiece*> PieceMap;
 
 struct S3DModelPiece {
-	std::string name;
-	int type;               //! MODELTYPE_*
-	//LuaTable* meta;
-    S3DModel* model;
-    std::string parentName;
-	S3DModelPiece* parent;
-    std::vector<S3DModelPiece*> childs;
+	S3DModelPiece(): type(-1) {
+		parent = NULL;
+		colvol = NULL;
 
-	bool isEmpty;
-	unsigned int displist;
+		isEmpty = true;
+		dispListID = 0;
+	}
 
-	// defaults to a box
-	CollisionVolume* colvol;
-
-	// float3 dir;    // TODO?
-	float3 mins;
-	float3 maxs;
-	float3 goffset;   // wrt. root
-
-	float3 pos;
-	float3 rot; //! in radian
-	float3 scale;
-
-    S3DModelPiece();
-	~S3DModelPiece();
+	virtual ~S3DModelPiece();
 	virtual void DrawList() const = 0;
 	virtual int GetVertexCount() const { return 0; }
 	virtual int GetNormalCount() const { return 0; }
@@ -62,15 +46,45 @@ struct S3DModelPiece {
 	virtual const float3& GetVertexPos(int) const = 0;
 	virtual void Shatter(float, int, int, const float3&, const float3&) const {}
 	void DrawStatic() const;
+
+
+	int type;               //! MODELTYPE_*
+	std::string name;
+    S3DModel* model;
+	S3DModelPiece* parent;
+    std::string parentName;
+	std::vector<S3DModelPiece*> childs;
+
+	CollisionVolume* colvol;
+
+	bool isEmpty;
+	unsigned int dispListID;
+
+	float3 mins;
+	float3 maxs;
+
+	float3 offset;		//! relative to parent
+	float3 goffset;		//! wrt. root
+	float3 rot; 		//! in radian
+	float3 scale;		//! not used yet
 };
 
 
 struct S3DModel
 {
-	int id; //! unsynced ID, starting with 1
-    std::string name;
-    //LuaTable* meta;
-	int type;               //! MODELTYPE_*
+	S3DModel(): id(-1), type(-1), textureType(-1) {
+		numobjects = 0;
+
+		radius = 0.0f;
+		height = 0.0f;
+
+		rootPiece = NULL;
+	}
+
+	inline S3DModelPiece* GetRootPiece() { return rootPiece; }
+	inline void SetRootPiece(S3DModelPiece* p) { rootPiece = p; }
+	inline void DrawStatic() const { rootPiece->DrawStatic(); }
+    S3DModelPiece* FindPiece( std::string name );
 
 	// TODO: Move next 5 fields into S3DModelPiece for per-piece texturing (or remove entirely and put data into textures array)
 	int textureType;        //! FIXME: MAKE S3O ONLY (0 = 3DO, otherwise S3O or OBJ)
@@ -79,7 +93,11 @@ struct S3DModel
 	std::string tex1;
 	std::string tex2;
 
-	int numobjects;
+	int id;                 //! unsynced ID, starting with 1
+	int type;               //! MODELTYPE_*
+	int textureType;        //! FIXME: MAKE S3O ONLY (0 = 3DO, otherwise S3O or OBJ)
+
+	int numPieces;
 	float radius;
 	float height;
 
@@ -87,15 +105,9 @@ struct S3DModel
 	float3 maxs;
 	float3 relMidPos;
 
-	S3DModelPiece* rootobject;  //! The piece at the base of the model hierarchy
 	PieceMap pieces;   //! Lookup table for pieces by name
-
 	const aiScene* scene; //! For Assimp models. Contains imported data. NULL for s3o/3do.
-
-    S3DModel();
-    ~S3DModel();
-    S3DModelPiece* FindPiece( std::string name );
-	inline void DrawStatic() const { rootobject->DrawStatic(); };
+	S3DModelPiece* rootPiece;
 };
 
 
@@ -120,7 +132,7 @@ struct LocalModelPiece
 	// of the original->colvol
 	CollisionVolume* colvol;
 
-	unsigned int displist;
+	unsigned int dispListID;
 	std::vector<unsigned int> lodDispLists;
 
 

@@ -50,11 +50,8 @@ S3DModelPiece* S3DModel::FindPiece( std::string name )
 void S3DModelPiece::DrawStatic() const
 {
 	glPushMatrix();
-	glTranslatef(pos.x, pos.y, pos.z);
-	if (rot[1]) { glRotatef(rot[1] * RADTOANG, 0.0f, 1.0f, 0.0f); }
-	if (rot[0]) { glRotatef(rot[0] * RADTOANG, 1.0f, 0.0f, 0.0f); }
-	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
-	glCallList(displist);
+	glTranslatef(offset.x, offset.y, offset.z);
+	glCallList(dispListID);
 	for (std::vector<S3DModelPiece*>::const_iterator ci = childs.begin(); ci != childs.end(); ++ci) {
 		(*ci)->DrawStatic();
 	}
@@ -72,7 +69,7 @@ S3DModelPiece::S3DModelPiece()
 
 S3DModelPiece::~S3DModelPiece()
 {
-	glDeleteLists(displist, 1);
+	glDeleteLists(dispListID, 1);
 	delete colvol;
 }
 
@@ -153,7 +150,7 @@ void LocalModelPiece::Draw() const
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
 
 	if (visible)
-		glCallList(displist);
+		glCallList(dispListID);
 
 	for (unsigned int i = 0; i < childs.size(); i++) {
 		childs[i]->Draw();
@@ -165,7 +162,7 @@ void LocalModelPiece::Draw() const
 
 void LocalModelPiece::DrawLOD(unsigned int lod) const
 {
-	if (!visible && childs.size()==0)
+	if (!visible && childs.empty())
 		return;
 
 	glPushMatrix();

@@ -141,24 +141,18 @@ S3DModel* C3DOParser::Load(const string& name)
 		model->flipTexY = false; // unused by 3DO
 		model->invertAlpha = false; // unused by 3DO
 		model->numobjects  = 0;
-		model->mins = DEF_MIN_SIZE;
-		model->maxs = DEF_MAX_SIZE;
 		model->radius = 0.0f;
 		model->height = 0.0f;
 
 	S3DOPiece* rootobj = LoadPiece(model, 0, NULL, &model->numobjects);
 
 	model->rootobject = rootobj;
-	model->radius =
-		(((model->maxs.x - model->mins.x) * 0.5f) * ((model->maxs.x - model->mins.x) * 0.5f)) +
-		(((model->maxs.y - model->mins.y) * 0.5f) * ((model->maxs.y - model->mins.y) * 0.5f)) +
-		(((model->maxs.z - model->mins.z) * 0.5f) * ((model->maxs.z - model->mins.z) * 0.5f));
-	model->radius = math::sqrt(model->radius);
-	model->height = model->maxs.y - model->mins.y;
-	// model->height = model->radius * 2.0f;
-	model->relMidPos = (model->maxs - model->mins) * 0.5f;
-	model->relMidPos.x = 0.0f; // ?
-	model->relMidPos.z = 0.0f; // ?
+
+	model->mins = model->FindMins( );
+    model->maxs = model->FindMaxs( );
+	model->radius = model->FindRadius( );
+	model->height = model->FindHeight( );
+	model->center = model->FindCenter( );
 
 	delete[] fileBuf;
 	return model;
@@ -453,19 +447,6 @@ void S3DOPiece::DrawList() const
 	}
 
 	// glFrontFace(GL_CCW);
-}
-
-void S3DOPiece::SetMinMaxExtends()
-{
-	for (std::vector<S3DOVertex>::const_iterator vi = vertices.begin(); vi != vertices.end(); ++vi) {
-		mins.x = std::min(mins.x, (goffset.x + vi->pos.x));
-		mins.y = std::min(mins.y, (goffset.y + vi->pos.y));
-		mins.z = std::min(mins.z, (goffset.z + vi->pos.z));
-
-		maxs.x = std::max(maxs.x, (goffset.x + vi->pos.x));
-		maxs.y = std::max(maxs.y, (goffset.y + vi->pos.y));
-		maxs.z = std::max(maxs.z, (goffset.z + vi->pos.z));
-	}
 }
 
 void S3DOPiece::Shatter(float pieceChance, int /*texType*/, int team, const float3& pos, const float3& speed) const

@@ -39,6 +39,61 @@ S3DModelPiece::~S3DModelPiece()
 	delete colvol;
 }
 
+// Use the transformed piece vertices to find min/max extents of entire piece
+S3DModelPiece::UpdateMinMax( float3& pos )
+{
+if (!piece->meta->KeyExists("mins")) {
+
+//////////////////////////////////////////////////////////////////////
+// S3DModel
+//
+
+// Use the transformed piece extents to find min/max extents of entire model
+S3DModel::UpdateMinMax( S3DModelPiece* piece )
+{
+    if (!meta->KeyExists("mins")) {
+        for (std::vector<S3DModelPiece*>::const_iterator ci = childs.begin(); ci != childs.end(); ci++) {
+	mins.x = std::min(piece->goffset + piece->mins.x, mins.x);
+	mins.y = std::min(piece->goffset + piece->mins.y, mins.y);
+	mins.z = std::min(piece->goffset + piece->mins.z, mins.z);
+	maxs.x = std::max(piece->goffset + piece->maxs.x, maxs.x);
+	maxs.y = std::max(piece->goffset + piece->maxs.y, maxs.y);
+	maxs.z = std::max(piece->goffset + piece->maxs.z, maxs.z);
+}
+
+float3 S3DModel::FindMaxs( bool recursive = false )
+{
+    float3& maxs = float3(0.0f, 0.0f, 0.0f);
+    if (recursive) {
+        for (std::vector<S3DModelPiece*>::const_iterator ci = childs.begin(); ci != childs.end(); ci++) {
+            float3& child_maxs = (*ci)->FindMaxs(true);
+
+        }
+    }
+    return mins
+}
+
+// Use the untransformed model min/max extents to calculate a radius
+float S3DModel::FindRadius( )
+{
+    return math::sqrt(
+		(((maxs.x - mins.x) * 0.5f) * ((maxs.x - mins.x) * 0.5f)) +
+		(((maxs.y - mins.y) * 0.5f) * ((maxs.y - mins.y) * 0.5f)) +
+		(((maxs.z - mins.z) * 0.5f) * ((maxs.z - mins.z) * 0.5f));
+	);
+}
+
+// Use the untransformed piece min/max extents to calculate height
+float3 S3DModel::FindHeight( )
+{
+    return maxs.y - mins.y;
+}
+
+// Use the untransformed piece min/max extents to calculate the center of the model
+float3 S3DModel::FindCenter( )
+{
+    return (maxs - mins) * 0.5f;
+}
 
 /******************************************************************************/
 /******************************************************************************/

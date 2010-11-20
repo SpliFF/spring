@@ -47,6 +47,10 @@ struct S3DModelPiece {
 	virtual void Shatter(float, int, int, const float3&, const float3&) const {}
 	void DrawStatic() const;
 
+	void SetCollisionVolume(CollisionVolume* cv) { colvol = cv; }
+	const CollisionVolume* GetCollisionVolume() const { return colvol; }
+	      CollisionVolume* GetCollisionVolume()       { return colvol; }
+
 
 	int type;               //! MODELTYPE_*
 	std::string name;
@@ -73,7 +77,7 @@ struct S3DModelPiece {
 struct S3DModel
 {
 	S3DModel(): id(-1), type(-1), textureType(-1) {
-		numobjects = 0;
+		numPieces = 0;
 
 		radius = 0.0f;
 		height = 0.0f;
@@ -111,30 +115,35 @@ struct S3DModel
 };
 
 
+
 struct LocalModelPiece
 {
-	// TODO: add (visibility) maxradius!
-
 	float3 pos;
 	float3 rot; //! in radian
 	float3 scale;
 
+	// TODO: add (visibility) maxradius!
 	bool visible;
 
-	//! MODELTYPE_*
-	int type;
-	std::string name;
+	CollisionVolume* colvol;
 	S3DModelPiece* original;
+
 	LocalModelPiece* parent;
 	std::vector<LocalModelPiece*> childs;
-
-	// initially always a clone
-	// of the original->colvol
-	CollisionVolume* colvol;
 
 	unsigned int dispListID;
 	std::vector<unsigned int> lodDispLists;
 
+
+	void Init(S3DModelPiece* piece) {
+		original   =  piece;
+		dispListID =  piece->dispListID;
+		visible    = !piece->isEmpty;
+		pos        =  piece->offset;
+		rot        =  ZeroVector;
+
+		childs.reserve(piece->childs.size());
+	}
 
 	void Draw() const;
 	void DrawLOD(unsigned int lod) const;
@@ -145,12 +154,29 @@ struct LocalModelPiece
 	float3 GetDirection() const;
 	bool GetEmitDirPos(float3& pos, float3& dir) const;
 	CMatrix44f GetMatrix() const;
+
+	void SetCollisionVolume(CollisionVolume* cv) { colvol = cv; }
+	const CollisionVolume* GetCollisionVolume() const { return colvol; }
+	      CollisionVolume* GetCollisionVolume()       { return colvol; }
 };
 
 struct LocalModel
 {
-	LocalModel() : type(-1), lodCount(0) {}
+	LocalModel(const S3DModel* model) : type(-1), lodCount(0) {
+		type = model->type;
+		pieces.reserve(model->numPieces);
+
+		assert(model->numPieces >= 1);
+
+		for (unsigned int i = 0; i < model->numPieces; i++) {
+			pieces.push_back(new LocalModelPiece());
+		}
+
+		pieces[0]->parent = NULL;
+	}
+
 	~LocalModel();
+
 
 	int type;  //! MODELTYPE_*
 	unsigned int lodCount;

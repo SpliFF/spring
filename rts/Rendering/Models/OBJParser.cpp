@@ -406,8 +406,6 @@ void COBJParser::BuildModelPieceTreeRec(
 			vertexGlobalPos = vertexLocalPos + piece->goffset;
 		}
 
-        piece->UpdateMinMax( vertexLocalPos );
-
 		// NOTE: the min- and max-extends of a piece are not calculated
 		// recursively over its children since this makes little sense
 		// for (per-piece) coldet purposes; the model extends do bound
@@ -426,8 +424,13 @@ void COBJParser::BuildModelPieceTreeRec(
 		// we want vertices in piece-space
 		piece->SetVertex(i, vertexLocalPos);
 	}
-    piece->UpdateMinMax( );
-    model->UpdateMinMax( piece );
+
+	model->mins.x = std::min(piece->mins.x, model->mins.x);
+	model->mins.y = std::min(piece->mins.y, model->mins.y);
+	model->mins.z = std::min(piece->mins.z, model->mins.z);
+	model->maxs.x = std::max(piece->maxs.x, model->maxs.x);
+	model->maxs.y = std::max(piece->maxs.y, model->maxs.y);
+	model->maxs.z = std::max(piece->maxs.z, model->maxs.z);
 
 	const float3 cvScales = piece->maxs - piece->mins;
 	const float3 cvOffset =

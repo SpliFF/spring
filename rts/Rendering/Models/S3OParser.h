@@ -7,6 +7,13 @@
 #include "IModelParser.h"
 
 
+struct SS3OVertex {
+	float3 pos;
+	float3 normal;
+	float textureX;
+	float textureY;
+};
+
 struct SS3OPiece: public S3DModelPiece {
 	SS3OPiece() { parent = NULL; }
 	~SS3OPiece() {
@@ -24,7 +31,7 @@ struct SS3OPiece: public S3DModelPiece {
 	const float3& GetVertexPos(int idx) const { return vertices[idx].pos; }
 	void Shatter(float, int, int, const float3&, const float3&) const;
 
-
+	std::vector<SS3OVertex> vertices;
 	std::vector<unsigned int> vertexDrawOrder;
 	int primitiveType;
 

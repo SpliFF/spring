@@ -1,14 +1,14 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-/* Defines a framework which can be used for modelling Sim or UI purposes */
-
 #ifndef _3DMODEL_H
 #define _3DMODEL_H
 
 #include <vector>
 #include <string>
 #include <set>
-#include "assimp.hpp"
+#include "Matrix44f.h"
+
+
 
 const int
 	MODELTYPE_3DO   = 0,
@@ -17,116 +17,132 @@ const int
 	MODELTYPE_ASS	= 3, // Model loaded by Assimp library
 	MODELTYPE_OTHER	= 4; // For future use. Still used in some parts of code.
 
-const int
-	MODELAXIS_X = 0,
-	MODELAXIS_Y = 1,
-	MODELAXIS_Z = 2;
+struct CollisionVolume;
+struct S3DModel;
+struct S3DModelPiece;
+struct LocalModel;
+struct LocalModelPiece;
+struct aiScene;
 
-class CModel;
 
-/** Unsynced mesh base class
+struct S3DModelPiece {
+	std::string name;
+	std::vector<S3DModelPiece*> childs;
 
-This class defines a mesh which may be used by one or more models. Each mesh instance can have its own textures and shaders
-For efficiency the class inherits directly from aiMesh. This avoids unessesary data copying. S30/3DO loaders can create these structs easily enough.
-**/
+	S3DModelPiece* parent;
 
-class CMesh: public aiMesh
+	bool isEmpty;
+	unsigned int displist;
+
+	//! MODELTYPE_*
+	int type;
+
+	// defaults to a box
+	CollisionVolume* colvol;
+
+	// float3 dir;    // TODO?
+	float3 mins;
+	float3 maxs;
+	float3 offset;    // wrt. parent
+	float3 goffset;   // wrt. root
+
+	virtual ~S3DModelPiece();
+	virtual void DrawList() const = 0;
+	virtual int GetVertexCount() const { return 0; }
+	virtual int GetNormalCount() const { return 0; }
+	virtual int GetTxCoorCount() const { return 0; }
+	virtual void SetMinMaxExtends() {}
+	virtual void SetVertexTangents() {}
+	virtual const float3& GetVertexPos(int) const = 0;
+	virtual void Shatter(float, int, int, const float3&, const float3&) const {}
+	void DrawStatic() const;
+};
+
+
+struct S3DModel
 {
-public:
-    int id;                                 //! Mesh ID
-    CModel* model;                          //! Points back to user of this mesh instance. Can be NULL
-	std::vector<CTexture*> textures;        //! Textures assigned to this mesh
-	std::vector<CShader*> shaders;          //! Shaders assigned to this mesh
-}
+	int id; //! unsynced ID, starting with 1
 
-/** Unsynced piece base class
+	int type;               //! MODELTYPE_*
+	int textureType;        //! FIXME: MAKE S3O ONLY (0 = 3DO, otherwise S3O or OBJ)
+	int flipTexY;			// Turn both textures upside down before use
+	int invertAlpha;		// Invert teamcolor alpha channel in S3O texture 1
 
-This class combines all rendering related properties from the old S3D(Local)Model and S3D(Local)ModelPiece structs into a universal generic base class
-Instances of this class can be used for rendering the same model in different parts of the screen/world and for creating new hierarchies
-All *Abs* functions account for accumulated transforms in ancestor models (the models parent, and its parents right up to the root)
-All *Iter* functions repeat for all descendents of a node
-A model contains metadata which can be set in a metadata file and accessed from unsynced scripts
-If you want to change class members directly rather than use the helper functions you can as long as you remember to set the changed flag when you are done.
-The Draw* functions build render queues with per-mesh texture lookup, allowing multiple textures per model.
-The On* functions are virtuals which could be used to synchronise animation events with unit or UI scripts
-A Lua wrapper is provided to manipulate models from scripts
-**/
+	std::string name;
+	std::string tex1;
+	std::string tex2;
+
+	int numobjects;
+	float radius;
+	float height;
+
+	float3 mins;
+	float3 maxs;
+	float3 relMidPos;
+
+	S3DModelPiece* rootobject;
+
+	const aiScene* scene; // For Assimp models. Contains imported data. NULL for s3o/3do.
+
+	inline void DrawStatic() const { rootobject->DrawStatic(); };
+};
 
 
-class CModelPiece: public aiNode
+struct LocalModelPiece
 {
-private:
-	int id;                                         //! ID, starting with 1. Currently used for FarTexture creation
-	int type;                                       //! MODELTYPE_*
-	std::string name;                               //! Used to identify this model
+	// TODO: add (visibility) maxradius!
 
-public:
-    bool changed;                                   //! Set when GL buffers need to be updated
-    bool hidden;                                    //! Set if model shouldn't be rendered
-    CMatrix44f mat;                                 //! Current transformation relative to parent
+	float3 pos;
+	float3 rot; //! in radian
+	bool updated; //FIXME unused?
+	bool visible;
 
-	// Associated objects
-    LuaTable& meta;                                 //! Lua metadata. Defines special/custom model properties in Lua format
-	std::vector<CMesh*> meshes;                     //! Meshes used by this model
+	//! MODELTYPE_*
+	int type;
+	std::string name;
+	S3DModelPiece* original;
+	LocalModelPiece* parent;
+	std::vector<LocalModelPiece*> childs;
 
-    // Rendering
-    void Setup() const;                             //! Create OpenGL buffers/arrays
-    void Update() const;                            //! Update OpenGL buffers/arrays
+	// initially always a clone
+	// of the original->colvol
+	CollisionVolume* colvol;
 
-    void Show() const;                              //! Change visibility and activate Lua callbacks
-    void Hide() const;
-    void Toggle() const;
+	unsigned int displist;
+	std::vector<unsigned int> lodDispLists;
 
-	void DrawUI() const;                            //! Render buffers using current transform in UI coordinate space
-	void DrawUI( CMatrix44f mat ) const;            //! Render buffers with specific transform in UI coordinate space
-	void DrawUI( float3 pos, float3 rot, float3 sca ) const;
-	void DrawUI( float3 pos ) const;
-	void DrawUI( float x, float y ) const;          //! Render buffers with 2D offset in UI/screen (X,Y) coordinate space
-	void DrawWorld() const;                         //! Render buffers using current transform in world/map space
-	void DrawWorld( CMatrix44f mat ) const;         //! Render buffers with specific transform in world/map space
-	void DrawWorld( float3 pos, float3 rot, float3 sca ) const;
-	void DrawWorld( float3 pos ) const;
-	void DrawWorld( float x, float z ) const;       //! Render buffers with 2D offset in world/map space. Y is set to ground height
+	void Draw() const;
+	void DrawLOD(unsigned int lod) const;
+	void SetLODCount(unsigned int count);
+	void ApplyTransform() const;
+	void GetPiecePosIter(CMatrix44f* mat) const;
+	float3 GetPos() const;
+	CMatrix44f GetMatrix() const;
+	float3 GetDirection() const;
+	bool GetEmitDirPos(float3 &pos, float3 &dir) const;
+};
 
-	// Callback hooks to be implemented by higher-level classes
-	virtual OnHide() const;
-	virtual OnShow() const;
-    virtual OnUpdate() const;
-}
-
-/** Unsynced animated mesh/piece classes
-
-These classes implement more complex pieces using imported Assimp data structures. These pieces can be animated in unsynced code.
-Instances of this class can be used for rendering the same model in different parts of the screen/world and for creating new hierarchies
-A piece corresponds to one Assimp "aiNode", a mesh to an "aiMesh". A model file will generally contain multiple nodes
-Pieces can be assigned an animation channel and animations can be controlled from script. Animation tracks are read-only and unsynced
-Pieces reference the aiScene and aiNode Assimp objects that created them. These objects are used to access additional read-only properties
-The On* functions are virtuals which could be used to synchronise animation events with unit or UI scripts
-A Lua wrapper is provided to manipulate models from scripts
-**/
-
-class CAnim: public aiAnimation
+struct LocalModel
 {
+	LocalModel() : type(-1), lodCount(0) {};
+	~LocalModel();
 
-	aiAnim* anim;                                   //! Assimp animation
-	int frame;                                      //! Current animation frame
+	int type;  //! MODELTYPE_*
 
-	const aiScene* scene;                           //! Assimp scene. Contains data shared by nodes. Read-only
-	const aiNode* node;                             //! Assimp node. Includes mesh, bone and animation references. Read-only
+	std::vector<LocalModelPiece*> pieces;
+	unsigned int lodCount;
 
-	// Animation helpers
-	GetAnimName() const;                            //! Get current animation name
-	GetAnimChannelNum() const;                      //! Get/Set current animation channel/track
-	SetAnimChannelNum( int n ) const;
-	GetAnimFrameNum() const;                        //! Get/Set current animation channel frame
-	SetAnimFrameNum( int n ) const;
-	SkipFrames( int n, bool wrap = true ) const;    //! Skip (or backtrack) n frames of animation. Can bet set to wrap or stop at start/end
+	inline void Draw() const { pieces[0]->Draw(); };
+	inline void DrawLOD(unsigned int lod) const { if (lod <= lodCount) pieces[0]->DrawLOD(lod);};
+	void SetLODCount(unsigned int count);
 
-	// Animation callback hooks
-    virtual OnAnimationStart() const;
-	virtual OnAnimationStep() const;
-	virtual OnAnimationEnd() const;
-}
+	//! raw forms, the piecenum must be valid
+	void ApplyRawPieceTransform(int piecenum) const;
+	float3 GetRawPiecePos(int piecenum) const;
+	CMatrix44f GetRawPieceMatrix(int piecenum) const;
+	float3 GetRawPieceDirection(int piecenum) const;
+	void GetRawEmitDirPos(int piecenum, float3 &pos, float3 &dir) const;
+};
 
 
 #endif /* _3DMODEL_H */

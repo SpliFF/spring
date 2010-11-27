@@ -20,7 +20,7 @@ public:
 		, drawRadius(0)
 		, useAirLos(false)
 		, alwaysVisible(false)
-		, rootpiece(NULL)
+		, model(NULL)
 	{}
 	CWorldObject(const float3& pos)
 		: id(0)
@@ -30,7 +30,7 @@ public:
 		, drawRadius(0)
 		, useAirLos(false)
 		, alwaysVisible(false)
-		, rootpiece(NULL)
+		, model(NULL)
 	{}
 
 	void SetRadius(float r);
@@ -46,7 +46,7 @@ public:
 	bool useAirLos;     ///< if true, object's visibility is checked against airLosMap[allyteam]
 	bool alwaysVisible;
 
-	CWorldPiece* rootpiece;  /// First link in the chain of model pieces used for skeleton and rendering
+	S3DModel* model;
 };
 
 #endif /* WORLD_OBJECT_H */

@@ -17,7 +17,7 @@ struct SAssVertex {
 	bool hasTangent;
 };
 
-struct SAssPiece: public CModelPiece
+struct SAssPiece: public S3DModelPiece
 {
 public:
 	aiNode* node;

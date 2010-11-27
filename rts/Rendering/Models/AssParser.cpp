@@ -56,31 +56,28 @@ public:
 };
 
 
-LuaTable& CAssParser::LoadMeta(const std::string& modelFileName)
+
+S3DModel* CAssParser::Load(const std::string& modelFileName)
+{
+	logOutput.Print (LOG_MODEL, "AssParser: Loading model: %s\n", modelFileName.c_str() );
+
 	// Load the lua metafile. This contains properties unique to Spring models and must return a table
-	std::string metaFileName = modelName + ".lua";
+	std::string metaFileName = modelFileName.substr(0, modelFileName.find_last_of('.')) + ".lua";
 	CFileHandler metaFile(metaFileName);
 	LuaParser metaFileParser(metaFileName, SPRING_VFS_MOD_BASE, SPRING_VFS_ZIP);
 
 	if (!metaFileParser.Execute()) {
 		if (!metaFile.FileExists()) {
-			logOutput.Print(LOG_MODEL, "AssParser: No metafile '%s'. Using defaults.", metaFileName.c_str());
+			logOutput.Print(LOG_MODEL, "AssParser: No meta-file '%s'. Using defaults.", metaFileName.c_str());
 		} else {
 			logOutput.Print(LOG_MODEL, "AssParser: ERROR in '%s': %s. Using defaults.", metaFileName.c_str(), metaFileParser.GetErrorLog().c_str());
 		}
 	} else {
-		logOutput.Print(LOG_MODEL, "AssParser: Using model metafile '%s'", metaFileName.c_str());
+		logOutput.Print(LOG_MODEL, "AssParser: Using model meta-file '%s'", metaFileName.c_str());
 	}
 
 	// Get the (root-level) model table
-	return metaFileParser.GetRoot();
-}
-
-
-S3DModel* CAssParser::Load(const std::string& modelFileName)
-{
-	logOutput.Print (LOG_MODEL, "AssParser: Loading model: %s\n", modelFileName.c_str() );
-    std::string modelName = modelFileName.substr(0, modelFileName.find_last_of('.'));
+	const LuaTable modelTable = metaFileParser.GetRoot();
 
 	// Create a model importer instance
  	Assimp::Importer importer;
@@ -103,25 +100,15 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
 		logOutput.Print(LOG_MODEL, "AssParser: Processing scene for model: %s (%d meshes / %d materials / %d textures)", modelFileName.c_str(), scene->mNumMeshes, scene->mNumMaterials, scene->mNumTextures );
 		model->name = modelFileName;
 		model->type = MODELTYPE_ASS;
-		model->meta = LoadMeta( modelName );
 		model->scene = scene;
 		model->numobjects = 0;
 
-        // Global transform to manually align model with Spring coords
-		model->relMidPos = modelTable.GetFloat3("position", float3(0.0f,0.0f,0.0f));
-		float3 rotation = modelTable.GetFloat3("rotation", float3(0.0f,0.0f,0.0f));
-		float3 scale = modelTable.GetFloat3("scale", float3(1.0f,1.0f,1.0f));
-        logOutput.Print(LOG_MODEL, "AssParser: Model transform: pos (%f,%f,%f), rot(%f,%f,%f), scale(%f,%f,%f)",
-            model->relMidPos.x, model->relMidPos.y, model->relMidPos.z,
-            rotation.x, rotation.y, rotation.z,
-            scale.x, scale.y, scale.z
-        );
-
 		// Simplified dimensions used for rough calculations
-		model->mins = modelTable.KeyExists("mins") ? modelTable.GetFloat3("mins", float3(0.0f,0.0f,0.0f)) : model->FindMins();
-		model->maxs = modelTable.KeyExists("maxs") ? modelTable.GetFloat3("maxs", float3(1.0f,1.0f,1.0f)) : model->FindMaxs();
 		model->radius = modelTable.GetFloat("radius", 1.0f);
 		model->height = modelTable.GetFloat("height", 1.0f);
+		model->relMidPos = modelTable.GetFloat3("midpos", float3(0.0f,0.0f,0.0f));
+		model->mins = modelTable.GetFloat3("mins", float3(0.0f,0.0f,0.0f));
+		model->maxs = modelTable.GetFloat3("maxs", float3(1.0f,1.0f,1.0f));
 
 		// Assign textures
 		// The S3O texture handler uses two textures.
@@ -136,10 +123,21 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
 		logOutput.Print(LOG_MODEL, "AssParser: Loading textures. Tex1: '%s' Tex2: '%s'", model->tex1.c_str(), model->tex2.c_str());
 		texturehandlerS3O->LoadS3OTexture(model);
 
-		logOutput.Print(LOG_MODEL, "AssParser: Loading pieces from root node '%s'", scene->mRootNode->mName.data);
+		// Identify and load the root object in the model.
+		//const aiString hitboxName( std::string("hitbox") );
 
+		logOutput.Print(LOG_MODEL, "AssParser: Loading pieces from root node '%s'", scene->mRootNode->mName.data);
 		SAssPiece* rootPiece = LoadPiece( scene->mRootNode, model );
 		model->rootobject = rootPiece;
+
+		// Load size defaults from 'hitbox' object in model (if it exists).
+		// If it doesn't exist loop of all pieces
+		// These values can be overridden in unitDef
+		//const aiString hitboxName( std::string("hitbox") );
+		//aiNode* hitbox = scene->mRootNode->FindNode( hitboxName );
+		//if (!hitbox) {
+		//	hitbox = scene->mRootNode;
+		//}
 
 		// Verbose logging of model properties
 		logOutput.Print(LOG_MODEL_DETAIL, "AssParser: model->name: %s", model->name.c_str());
@@ -168,7 +166,6 @@ SAssPiece* CAssParser::LoadPiece(aiNode* node, S3DModel* model)
 	piece->node = node;
 	piece->isEmpty = node->mNumMeshes == 0;
 
-    // get transform relative to parent
 	aiVector3D scale, position;
  	aiQuaternion rotation;
 	node->mTransformation.Decompose(scale,rotation,position);
@@ -286,14 +283,14 @@ SAssPiece* CAssParser::LoadPiece(aiNode* node, S3DModel* model)
 	model->maxs.z = std::max(piece->maxs.z, model->maxs.z);
 
 	// collision volume for piece (not sure about these coords)
-	const float3 cvScales = (piece->maxs*scale) - (piece->mins*scale);
+	const float3 cvScales = piece->maxs - piece->mins;
 	const float3 cvOffset = (piece->maxs - piece->offset) + (piece->mins - piece->offset);
 	//const float3 cvOffset(piece->offset.x, piece->offset.y, piece->offset.z);
 	piece->colvol = new CollisionVolume("box", cvScales, cvOffset, CollisionVolume::COLVOL_HITTEST_CONT);
 
 	// Recursively process all child pieces
 	for (unsigned int i = 0; i < node->mNumChildren; ++i) {
-		SAssPiece* childPiece = LoadPiece(node->mChildren[i], model, position, rotation, scale);
+		SAssPiece* childPiece = LoadPiece(node->mChildren[i], model);
 		piece->childs.push_back(childPiece);
 	}
 

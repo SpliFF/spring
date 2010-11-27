@@ -1,24 +1,5 @@
-#SET( LIBRARY_VERSION "1.0.0" )
-#SET( LIBRARY_SOVERSION "1" )
-
-IF ( ENABLE_BOOST_WORKAROUND )
-	INCLUDE_DIRECTORIES( BoostWorkaround )
-	ADD_DEFINITIONS( -DASSIMP_BUILD_BOOST_WORKAROUND )
-	MESSAGE( STATUS "Building a non-boost version of Assimp." )
-ELSE ( ENABLE_BOOST_WORKAROUND )
-	FIND_PACKAGE( Boost 1.35 )
-
-	IF ( NOT Boost_FOUND )
-		MESSAGE( FATAL_ERROR
-			"Boost libraries (http://www.boost.org/) not found. "
-			"You can build a non-boost version of Assimp with slightly reduced "
-			"functionality by specifying -DENABLE_BOOST_WORKAROUND=ON."
-		)
-	ENDIF ( NOT Boost_FOUND )
-
-	INCLUDE_DIRECTORIES( ${Boost_INCLUDE_DIRS} )
-ENDIF ( ENABLE_BOOST_WORKAROUND )
-
+SET( LIBRARY_VERSION "2.0.0" )
+SET( LIBRARY_SOVERSION "2" )
 
 #
 # Listing and grouping of all the source files for use with IDE project
@@ -61,6 +42,7 @@ SET( PUBLIC_HEADERS
 	${HEADER_PATH}/assimp.h
 	${HEADER_PATH}/assimp.hpp
 	${HEADER_PATH}/DefaultLogger.h
+	${HEADER_PATH}/ProgressHandler.h
 	${HEADER_PATH}/IOStream.h
 	${HEADER_PATH}/IOSystem.h
 	${HEADER_PATH}/Logger.h
@@ -84,8 +66,8 @@ SOURCE_GROUP( Boost FILES
 	BoostWorkaround/boost/tuple/tuple.hpp
 )
 
-SOURCE_GROUP( Logging FILES 
-	${HEADER_PATH}/DefaultLogger.h 
+SOURCE_GROUP( Logging FILES
+	${HEADER_PATH}/DefaultLogger.h
 	${HEADER_PATH}/IOStream.h
 	${HEADER_PATH}/LogStream.h
 	${HEADER_PATH}/Logger.h
@@ -95,9 +77,9 @@ SOURCE_GROUP( Logging FILES
 	FileLogStream.h
 )
 
-SOURCE_GROUP( Common FILES 
+SOURCE_GROUP( Common FILES
 	aiAssert.cpp
-	fast_atof.h	
+	fast_atof.h
 	qnan.h
 	BaseImporter.cpp
 	BaseImporter.h
@@ -105,6 +87,7 @@ SOURCE_GROUP( Common FILES
 	BaseProcess.h
 	ByteSwap.h
 	ProcessHelper.h
+	DefaultProgressHandler.h
 	DefaultIOStream.cpp
 	DefaultIOStream.h
 	DefaultIOSystem.cpp
@@ -141,9 +124,10 @@ SOURCE_GROUP( Common FILES
 	Vertex.h
 	LineSplitter.h
 	TinyFormatter.h
+	Profiler.h
 )
 
-SOURCE_GROUP( 3DS FILES 
+SOURCE_GROUP( 3DS FILES
 	3DSConverter.cpp
 	3DSHelper.h
 	3DSLoader.cpp
@@ -265,6 +249,11 @@ SOURCE_GROUP( NFF FILES
 	NFFLoader.h
 )
 
+SOURCE_GROUP( NDO FILES
+	NDOLoader.cpp
+	NDOLoader.h
+)
+
 SOURCE_GROUP( OFFFormat FILES
 	OFFLoader.cpp
 	OFFLoader.h
@@ -303,6 +292,20 @@ SOURCE_GROUP(COB FILES
 	COBLoader.cpp
 	COBLoader.h
 	COBScene.h
+)
+
+SOURCE_GROUP(BLENDER FILES
+	BlenderLoader.cpp
+	BlenderLoader.h
+	BlenderDNA.cpp
+	BlenderDNA.h
+	BlenderDNA.inl
+	BlenderScene.cpp
+	BlenderScene.h
+	BlenderSceneGen.h
+	BlenderIntermediate.h
+	BlenderModifier.h
+	BlenderModifier.cpp
 )
 
 SOURCE_GROUP( PostProcessing FILES
@@ -359,12 +362,15 @@ SOURCE_GROUP( Q3D FILES
 	Q3DLoader.h
 )
 
-#SOURCE_GROUP( Q3BSP FILES
-	#Q3BSPFileParser.h
-	#Q3BSPFileParser.cpp
-	#Q3BSPFileImporter.h
-	#Q3BSPFileImporter.cpp
-#)
+SOURCE_GROUP( Q3BSP FILES
+	Q3BSPFileData.h
+	Q3BSPFileParser.h
+	Q3BSPFileParser.cpp
+	Q3BSPFileImporter.h
+	Q3BSPFileImporter.cpp
+	Q3BSPZipArchive.h
+	Q3BSPZipArchive.cpp
+)
 
 SOURCE_GROUP( Raw FILES
 	RawLoader.cpp
@@ -439,7 +445,15 @@ SOURCE_GROUP( zlib FILES
 	../contrib/zlib/zutil.h
 )
 
-ADD_LIBRARY( assimp STATIC
+SOURCE_GROUP( unzip FILES
+	../contrib/unzip/crypt.h
+	../contrib/unzip/ioapi.c
+	../contrib/unzip/ioapi.h
+	../contrib/unzip/unzip.c
+	../contrib/unzip/unzip.h
+)
+
+ADD_LIBRARY( assimp SHARED
 	3DSConverter.cpp
 	3DSHelper.h
 	3DSLoader.cpp
@@ -481,6 +495,7 @@ ADD_LIBRARY( assimp STATIC
 	DefaultIOStream.h
 	DefaultIOSystem.cpp
 	DefaultIOSystem.h
+	DefaultProgressHandler.h
 	DefaultLogger.cpp
 	FileLogStream.h
 	FindDegenerates.cpp
@@ -575,10 +590,13 @@ ADD_LIBRARY( assimp STATIC
 	ProcessHelper.h
 	Q3DLoader.cpp
 	Q3DLoader.h
-#	Q3BSPFileParser.h
-#	Q3BSPFileParser.cpp
-#	Q3BSPFileImporter.h
-#	Q3BSPFileImporter.cpp
+	Q3BSPFileData.h
+	Q3BSPFileParser.h
+	Q3BSPFileParser.cpp
+	Q3BSPFileImporter.h
+	Q3BSPFileImporter.cpp
+	Q3BSPZipArchive.h
+	Q3BSPZipArchive.cpp
 	RawLoader.cpp
 	RawLoader.h
 	RemoveComments.cpp
@@ -666,6 +684,11 @@ ADD_LIBRARY( assimp STATIC
 	../contrib/zlib/zutil.c
 	../contrib/zlib/zutil.h
 	../contrib/ConvertUTF/ConvertUTF.c
+	../contrib/unzip/crypt.h
+	../contrib/unzip/ioapi.c
+	../contrib/unzip/ioapi.h
+	../contrib/unzip/unzip.c
+	../contrib/unzip/unzip.h
 	Subdivision.cpp
 	Subdivision.h
 	Vertex.h
@@ -676,6 +699,20 @@ ADD_LIBRARY( assimp STATIC
 	COBScene.h
 	TinyFormatter.h
 	LineSplitter.h
+	BlenderLoader.cpp
+	BlenderLoader.h
+	BlenderDNA.cpp
+	BlenderDNA.h
+	BlenderDNA.inl
+	BlenderScene.cpp
+	BlenderScene.h
+	BlenderSceneGen.h
+	BlenderIntermediate.h
+	BlenderModifier.h
+	BlenderModifier.cpp
+	Profiler.h
+	NDOLoader.cpp
+	NDOLoader.h
 
 	# Necessary to show the headers in the project when using the VC++ generator:
 	BoostWorkaround/boost/math/common_factor_rt.hpp
@@ -691,21 +728,20 @@ ADD_LIBRARY( assimp STATIC
 	${COMPILER_HEADERS}
 )
 
+#Build static for Spring
 #ADD_DEFINITIONS( -DASSIMP_BUILD_DLL_EXPORT )
 
-#if ( WIN32 )
-#	if ( MSVC80 OR MSVC90 )
-#		ADD_DEFINITIONS( -D_SCL_SECURE_NO_WARNINGS )
-#		ADD_DEFINITIONS( -D_CRT_SECURE_NO_WARNINGS )
-#	endif ( MSVC80 OR MSVC90 )
-#endif ( WIN32 )
- 
+if ( MSVC80 OR MSVC90 OR MSVC10 )
+	ADD_DEFINITIONS( -D_SCL_SECURE_NO_WARNINGS )
+	ADD_DEFINITIONS( -D_CRT_SECURE_NO_WARNINGS )
+endif ( MSVC80 OR MSVC90 OR MSVC10 )
+
+# Not needed for Spring
 #SET_TARGET_PROPERTIES( assimp PROPERTIES
 #	VERSION ${LIBRARY_VERSION}
 #	SOVERSION ${LIBRARY_SOVERSION}
 #)
 
-#Not needed? (SpliFF)
 #INSTALL( TARGETS assimp DESTINATION ${LIB_INSTALL_DIR} )
 #INSTALL( FILES ${PUBLIC_HEADERS} DESTINATION ${INCLUDE_INSTALL_DIR}/assimp )
 #INSTALL( FILES ${COMPILER_HEADERS} DESTINATION ${INCLUDE_INSTALL_DIR}/assimp/Compiler )

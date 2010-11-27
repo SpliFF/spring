@@ -4,7 +4,7 @@
 #ifdef WIN32
 
 #include "../include/LogStream.h"
-#include "windows.h"
+#include "Windows.h"
 
 namespace Assimp	{
 

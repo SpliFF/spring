@@ -221,6 +221,31 @@ void CMatrix44f::Translate(const float3& pos)
 	m[15] += x*m[3] + y*m[7] + z*m[11];
 }
 
+void CMatrix44f::Scale(float scalex, float scaley, float scalez)
+{
+  /* the function should be equivalent to doing this:
+  CMatrix44f scalemat;
+  scalemat[0] = scalex;
+  scalemat[5] = scaley;
+  scalemat[10] = scalez;
+  *this = Mul(scalemat);
+  */
+
+  m[0] *= scalex;
+  m[1] *= scalex;
+  m[2] *= scalex;
+  m[3] *= scalex;
+
+  m[4] *= scaley;
+  m[5] *= scaley;
+  m[6] *= scaley;
+  m[7] *= scaley;
+
+  m[8] *= scalez;
+  m[9] *= scalez;
+  m[10] *= scalez;
+  m[11] *= scalez;
+}
 
 CMatrix44f CMatrix44f::Mul(const CMatrix44f& m2) const
 {

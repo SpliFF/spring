@@ -36,6 +36,9 @@ public:
 	void RotateZ(float rad);
 	void Rotate(float rad, const float3& axis); // axis is assumed to be normalized
 	void Translate(float x, float y, float z);
+	void Translate(const float3& pos);
+	void Scale(float scalex, float scaley, float scalez);
+
 	CMatrix44f Mul(const CMatrix44f& other) const;
 
 	CMatrix44f& InvertInPlace();
@@ -49,7 +52,6 @@ public:
 	float3 GetPos(void) const { return float3(m[12], m[13], m[14]); }
 
 	void SetUpVector(float3& up);
-	void Translate(const float3& pos);
 
 	/// OpenGL ordered (ie. column-major)
 	float m[16];

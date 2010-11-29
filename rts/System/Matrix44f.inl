@@ -1,13 +1,6 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include "StdAfx.h"
-#include "Matrix44f.h"
-
-CR_BIND(CMatrix44f, );
-
-CR_REG_METADATA(CMatrix44f, CR_MEMBER(m));
-<<<<<<< HEAD
-
+#include "lib/streflop/streflop_cond.h"
 
 CMatrix44f::CMatrix44f()
 {
@@ -78,8 +71,8 @@ void CMatrix44f::LoadIdentity()
 void CMatrix44f::RotateX(float rad)
 {
 /*
-	const float sr = sin(rad);
-	const float cr = cos(rad);
+	const float sr = math::sin(rad);
+	const float cr = math::cos(rad);
 
 	CMatrix44f rm;
 	rm[5]  = +cr;
@@ -89,8 +82,8 @@ void CMatrix44f::RotateX(float rad)
 
 	*this=Mul(rm);
 */
-	const float sr = sin(rad);
-	const float cr = cos(rad);
+	const float sr = math::sin(rad);
+	const float cr = math::cos(rad);
 
 	float a=m[4];
 	m[4] = cr*a - sr*m[8];
@@ -113,8 +106,8 @@ void CMatrix44f::RotateX(float rad)
 void CMatrix44f::RotateY(float rad)
 {
 /*
-	const float sr = sin(rad);
-	const float cr = cos(rad);
+	const float sr = math::sin(rad);
+	const float cr = math::cos(rad);
 
 	CMatrix44f rm;
 	rm[0]  = +cr;
@@ -124,8 +117,8 @@ void CMatrix44f::RotateY(float rad)
 
 	*this = Mul(rm);
 */
-	const float sr = sin(rad);
-	const float cr = cos(rad);
+	const float sr = math::sin(rad);
+	const float cr = math::cos(rad);
 
 	float a=m[0];
 	m[0] =  cr*a + sr*m[8];
@@ -148,8 +141,8 @@ void CMatrix44f::RotateY(float rad)
 void CMatrix44f::RotateZ(float rad)
 {
 /*
-	const float sr = sin(rad);
-	const float cr = cos(rad);
+	const float sr = math::sin(rad);
+	const float cr = math::cos(rad);
 
 	CMatrix44f rm;
 	rm[0] = +cr;
@@ -159,8 +152,8 @@ void CMatrix44f::RotateZ(float rad)
 
 	*this = Mul(rm);
 */
-	const float sr = sin(rad);
-	const float cr = cos(rad);
+	const float sr = math::sin(rad);
+	const float cr = math::cos(rad);
 
 	float a=m[0];
 	m[0] = cr*a - sr*m[4];
@@ -220,31 +213,6 @@ void CMatrix44f::Translate(const float3& pos)
 	m[15] += x*m[3] + y*m[7] + z*m[11];
 }
 
-void CMatrix44f::Scale(float scalex, float scaley, float scalez)
-{
-  /* the function should be equivalent to doing this:
-  CMatrix44f scalemat;
-  scalemat[0] = scalex;
-  scalemat[5] = scaley;
-  scalemat[10] = scalez;
-  *this = Mul(scalemat);
-  */
-
-  m[0] *= scalex;
-  m[1] *= scalex;
-  m[2] *= scalex;
-  m[3] *= scalex;
-
-  m[4] *= scaley;
-  m[5] *= scaley;
-  m[6] *= scaley;
-  m[7] *= scaley;
-
-  m[8] *= scalez;
-  m[9] *= scalez;
-  m[10] *= scalez;
-  m[11] *= scalez;
-}
 
 CMatrix44f CMatrix44f::Mul(const CMatrix44f& m2) const
 {
@@ -308,8 +276,8 @@ void CMatrix44f::SetUpVector(float3& up)
 
 void CMatrix44f::Rotate(float rad, const float3& axis)
 {
-	const float sr = sin(rad);
-	const float cr = cos(rad);
+	const float sr = math::sin(rad);
+	const float cr = math::cos(rad);
 
 	for(int a=0;a<3;++a){
 		float3 v(m[a*4],m[a*4+1],m[a*4+2]);
@@ -440,5 +408,3 @@ bool CMatrix44f::Invert(const double m[4][4], double mInv[4][4])
 
 	return true;
 }
-=======
->>>>>>> edf408a... inline CMatrix44f

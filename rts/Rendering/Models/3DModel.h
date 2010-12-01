@@ -6,8 +6,8 @@
 #include <vector>
 #include <string>
 #include <set>
+#include <map>
 #include "Matrix44f.h"
-
 
 
 const int
@@ -23,19 +23,21 @@ struct S3DModelPiece;
 struct LocalModel;
 struct LocalModelPiece;
 struct aiScene;
+class LuaTable;
 
+typedef std::map<std::string, S3DModelPiece*> PieceMap;
 
 struct S3DModelPiece {
 	std::string name;
-	std::vector<S3DModelPiece*> childs;
-
+	int type;               //! MODELTYPE_*
+	//LuaTable* meta;
+    S3DModel* model;
+    std::string parentName;
 	S3DModelPiece* parent;
+    std::vector<S3DModelPiece*> childs;
 
 	bool isEmpty;
 	unsigned int displist;
-
-	//! MODELTYPE_*
-	int type;
 
 	// defaults to a box
 	CollisionVolume* colvol;
@@ -43,8 +45,11 @@ struct S3DModelPiece {
 	// float3 dir;    // TODO?
 	float3 mins;
 	float3 maxs;
-	float3 offset;    // wrt. parent
 	float3 goffset;   // wrt. root
+
+	float3 pos;
+	float3 rot; //! in radian
+	float3 scale;
 
 	virtual ~S3DModelPiece();
 	virtual void DrawList() const = 0;
@@ -62,13 +67,14 @@ struct S3DModelPiece {
 struct S3DModel
 {
 	int id; //! unsynced ID, starting with 1
-
+    std::string name;
+    //LuaTable* meta;
 	int type;               //! MODELTYPE_*
-	int textureType;        //! FIXME: MAKE S3O ONLY (0 = 3DO, otherwise S3O or OBJ)
-	int flipTexY;			// Turn both textures upside down before use
-	int invertAlpha;		// Invert teamcolor alpha channel in S3O texture 1
 
-	std::string name;
+	// TODO: Move next 5 fields into S3DModelPiece for per-piece texturing (or remove entirely and put data into textures array)
+	int textureType;        //! FIXME: MAKE S3O ONLY (0 = 3DO, otherwise S3O or OBJ)
+	int flipTexY;			//! Turn both textures upside down before use
+	int invertAlpha;		//! Invert teamcolor alpha channel in S3O texture 1
 	std::string tex1;
 	std::string tex2;
 
@@ -80,10 +86,12 @@ struct S3DModel
 	float3 maxs;
 	float3 relMidPos;
 
-	S3DModelPiece* rootobject;
+	S3DModelPiece* rootobject;  //! The piece at the base of the model hierarchy
+	PieceMap pieces;   //! Lookup table for pieces by name
 
-	const aiScene* scene; // For Assimp models. Contains imported data. NULL for s3o/3do.
+	const aiScene* scene; //! For Assimp models. Contains imported data. NULL for s3o/3do.
 
+    S3DModelPiece* FindPiece( std::string name );
 	inline void DrawStatic() const { rootobject->DrawStatic(); };
 };
 
@@ -94,6 +102,8 @@ struct LocalModelPiece
 
 	float3 pos;
 	float3 rot; //! in radian
+	float3 scale;
+
 	bool updated; //FIXME unused?
 	bool visible;
 

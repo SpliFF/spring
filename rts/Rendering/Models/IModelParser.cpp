@@ -7,11 +7,11 @@
 #include "mmgr.h"
 
 #include "IModelParser.h"
+#include "ConfigHandler.h"
 #include "3DModel.h"
 #include "3DModelLog.h"
 #include "3DOParser.h"
 #include "S3OParser.h"
-#include "OBJParser.h"
 #include "AssParser.h"
 #include "assimp.hpp"
 #include "Sim/Misc/CollisionVolume.h"
@@ -31,9 +31,8 @@ C3DModelLoader* modelParser = NULL;
 C3DModelLoader::C3DModelLoader(void)
 {
 	// file-extension should be lowercase
-	AddParser("3do", new C3DOParser());
-	AddParser("s3o", new CS3OParser());
-	//AddParser("obj", new COBJParser()); // replaced by Assimp
+	//AddParser("3do", new C3DOParser());
+	//AddParser("s3o", new CS3OParser());
 
 	// assimp library
 	CAssParser* unitassparser = new CAssParser();
@@ -98,10 +97,14 @@ S3DModel* C3DModelLoader::Load3DModel(std::string name, const float3& centerOffs
 	StringToLowerInPlace(name);
 
 	//! search in cache first
-	std::map<std::string, S3DModel*>::iterator ci;
-	if ((ci = cache.find(name)) != cache.end()) {
-		return ci->second;
-	}
+    std::map<std::string, S3DModel*>::iterator ci;
+    if ((ci = cache.find(name)) != cache.end()) {
+        if (!configHandler->Get("NoModelCache", 0)) {
+            return ci->second;
+        } else {
+            logOutput.Print("Cache disabled. Reloading model \"" + name + "\"");
+        }
+    }
 
 	//! not found in cache, create the model and cache it
 	const std::string fileExt = filesystem.GetExtension(name);
@@ -222,8 +225,9 @@ void C3DModelLoader::CreateLocalModelPieces(S3DModelPiece* piece, LocalModel* lm
 	lmp.displist  =  piece->displist;
 	lmp.visible   = !piece->isEmpty;
 	lmp.updated   =  false;
-	lmp.pos       =  piece->offset;
-	lmp.rot       =  float3(0.0f, 0.0f, 0.0f);
+	lmp.pos       =  piece->pos;
+	lmp.rot       =  piece->rot;
+	lmp.scale     =  piece->scale;
 
 	//logOutput.Print("Create CollisionVolume");
 	lmp.colvol    = new CollisionVolume(piece->colvol);

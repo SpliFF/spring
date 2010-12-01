@@ -348,10 +348,12 @@ S3DOPiece* C3DOParser::LoadPiece(S3DModel* model, int pos, S3DOPiece* parent, in
 
 		piece->mins = DEF_MIN_SIZE;
 		piece->maxs = DEF_MAX_SIZE;
-		piece->offset.x =  me.XFromParent * scaleFactor;
-		piece->offset.y =  me.YFromParent * scaleFactor;
-		piece->offset.z = -me.ZFromParent * scaleFactor;
-		piece->goffset = piece->offset + ((parent != NULL)? parent->goffset: ZeroVector);
+		piece->pos.x =  me.XFromParent * scaleFactor;
+		piece->pos.y =  me.YFromParent * scaleFactor;
+		piece->pos.z = -me.ZFromParent * scaleFactor;
+		piece->rot = ZeroVector;
+		piece->scale = float3(1.0f, 1.0f, 1.0f);
+		piece->goffset = piece->pos + ((parent != NULL)? parent->goffset: ZeroVector);
 
 	GetVertexes(&me, piece);
 	GetPrimitives(piece, me.OffsetToPrimitiveArray, me.NumberOfPrimitives, ((pos == 0)? me.SelectionPrimitive: -1));

@@ -453,7 +453,7 @@ SOURCE_GROUP( unzip FILES
 	../contrib/unzip/unzip.h
 )
 
-ADD_LIBRARY( assimp SHARED
+ADD_LIBRARY( assimp STATIC
 	3DSConverter.cpp
 	3DSHelper.h
 	3DSLoader.cpp

@@ -3,6 +3,7 @@
 #include "UnitDef.h"
 #include "UnitDefHandler.h"
 #include "UnitDefImage.h"
+#include "ConfigHandler.h"
 #include "Game/GameSetup.h"
 #include "Lua/LuaParser.h"
 #include "Map/MapInfo.h"
@@ -789,7 +790,7 @@ S3DModel* UnitDef::LoadModel() const
 	// not exactly kosher, but...
 	UnitDef* udef = const_cast<UnitDef*>(this);
 
-	if (udef->modelDef.model == NULL) {
+	if (udef->modelDef.model == NULL || configHandler->Get("NoModelCache", 0) == 1) {
 		udef->modelDef.model = modelParser->Load3DModel(udef->modelDef.modelPath, udef->modelCenterOffset);
 		udef->modelDef.modelTextures["tex1"] = udef->modelDef.model->tex1;
 		udef->modelDef.modelTextures["tex2"] = udef->modelDef.model->tex2;

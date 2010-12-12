@@ -272,9 +272,6 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
 	piece->rot = rotate;
 	piece->scale = scale;
 
-	piece->mins = float3(0.0f,0.0f,0.0f);
-	piece->maxs = float3(1.0f,1.0f,1.0f);
-
 	// Get vertex data from node meshes
 	for ( unsigned meshListIndex = 0; meshListIndex < node->mNumMeshes; meshListIndex++ ) {
 		unsigned int meshIndex = node->mMeshes[meshListIndex];

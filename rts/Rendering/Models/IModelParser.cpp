@@ -31,8 +31,8 @@ C3DModelLoader* modelParser = NULL;
 C3DModelLoader::C3DModelLoader(void)
 {
 	// file-extension should be lowercase
-	//AddParser("3do", new C3DOParser());
-	//AddParser("s3o", new CS3OParser());
+	AddParser("3do", new C3DOParser());
+	AddParser("s3o", new CS3OParser());
 
 	// assimp library
 	CAssParser* unitassparser = new CAssParser();

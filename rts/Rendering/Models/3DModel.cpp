@@ -60,6 +60,14 @@ void S3DModelPiece::DrawStatic() const
 	glPopMatrix();
 }
 
+S3DModelPiece::S3DModelPiece()
+{
+    pos = float3(0.0f,0.0f,0.0f);
+	rot = float3(0.0f,0.0f,0.0f);
+	scale = float3(1.0f,1.0f,1.0f);
+	mins = float3(0.0f,0.0f,0.0f);
+	maxs = float3(0.0f,0.0f,0.0f);
+}
 
 S3DModelPiece::~S3DModelPiece()
 {

@@ -51,7 +51,8 @@ struct S3DModelPiece {
 	float3 rot; //! in radian
 	float3 scale;
 
-	virtual ~S3DModelPiece();
+    S3DModelPiece();
+	~S3DModelPiece();
 	virtual void DrawList() const = 0;
 	virtual int GetVertexCount() const { return 0; }
 	virtual int GetNormalCount() const { return 0; }

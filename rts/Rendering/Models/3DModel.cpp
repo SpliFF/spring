@@ -21,6 +21,18 @@ static const float RADTOANG  = 180 / PI;
 //////////////////////////////////////////////////////////////////////
 // S3DModel
 //
+S3DModel::S3DModel()
+{
+	height = 0.0f;
+	radius = 0.0f;
+	relMidPos = float3(0.0f, 0.0f, 0.0f);
+	mins = float3(0.0f, 0.0f, 0.0f);
+	maxs = float3(0.0f, 0.0f, 0.0f);
+}
+S3DModel::~S3DModel()
+{
+
+}
 
 S3DModelPiece* S3DModel::FindPiece( std::string name )
 {
@@ -37,7 +49,7 @@ void S3DModelPiece::DrawStatic() const
 {
 	glPushMatrix();
 	glTranslatef(pos.x, pos.y, pos.z);
-	glScalef(scale.x, scale.y, scale.z);
+	//glScalef(scale.x, scale.y, scale.z);
 	if (rot[1]) { glRotatef(rot[1] * RADTOANG, 0.0f, 1.0f, 0.0f); }
 	if (rot[0]) { glRotatef(rot[0] * RADTOANG, 1.0f, 0.0f, 0.0f); }
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
@@ -127,7 +139,7 @@ void LocalModelPiece::Draw() const
 	glPushMatrix();
 
 	if (pos.x || pos.y || pos.z) { glTranslatef(pos.x, pos.y, pos.z); }
-	if (scale.x!=1.0f || scale.y!=1.0f || scale.z!=1.0f) { glScalef(scale.x, scale.y, scale.z); }
+	//if (scale.x!=1.0f || scale.y!=1.0f || scale.z!=1.0f) { glScalef(scale.x, scale.y, scale.z); }
 	if (rot[1]) { glRotatef(rot[1] * RADTOANG, 0.0f, 1.0f, 0.0f); }
 	if (rot[0]) { glRotatef(rot[0] * RADTOANG, 1.0f, 0.0f, 0.0f); }
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
@@ -151,7 +163,7 @@ void LocalModelPiece::DrawLOD(unsigned int lod) const
 	glPushMatrix();
 
 	if (pos.x || pos.y || pos.z) { glTranslatef(pos.x, pos.y, pos.z); }
-	if (scale.x!=1.0f || scale.y!=1.0f || scale.z!=1.0f) { glScalef(scale.x, scale.y, scale.z); }
+	//if (scale.x!=1.0f || scale.y!=1.0f || scale.z!=1.0f) { glScalef(scale.x, scale.y, scale.z); }
 	if (rot[1]) { glRotatef(rot[1] * RADTOANG, 0.0f, 1.0f, 0.0f); }
 	if (rot[0]) { glRotatef(rot[0] * RADTOANG, 1.0f, 0.0f, 0.0f); }
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
@@ -174,7 +186,7 @@ void LocalModelPiece::ApplyTransform() const
 	}
 
 	if (pos.x || pos.y || pos.z) { glTranslatef(pos.x, pos.y, pos.z); }
-	if (scale.x!=1.0f || scale.y!=1.0f || scale.z!=1.0f) { glScalef(scale.x, scale.y, scale.z); }
+	//if (scale.x!=1.0f || scale.y!=1.0f || scale.z!=1.0f) { glScalef(scale.x, scale.y, scale.z); }
 	if (rot[1]) { glRotatef(rot[1] * RADTOANG, 0.0f, 1.0f, 0.0f); }
 	if (rot[0]) { glRotatef(rot[0] * RADTOANG, 1.0f, 0.0f, 0.0f); }
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }

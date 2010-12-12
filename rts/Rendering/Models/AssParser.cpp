@@ -53,6 +53,7 @@ float3 QuaternionToRadianAngles( aiQuaternion q1 )
     float sqz = q1.z*q1.z;
 	float unit = sqx + sqy + sqz + sqw; // if normalised is one, otherwise is correction factor
 	float test = q1.x*q1.y + q1.z*q1.w;
+
 	float3 result(0.0f, 0.0f, 0.0f);
 
 	if (test > 0.499f * unit) { // singularity at north pole
@@ -69,7 +70,7 @@ float3 QuaternionToRadianAngles( aiQuaternion q1 )
 	return result;
 }
 
-// Convert float3 rotations in degrees to radians (in-place)
+// Convert float3 rotations in degrees to radians
 void DegreesToRadianAngles( float3& angles )
 {
     angles.x *= DEGTORAD;
@@ -93,7 +94,10 @@ public:
 S3DModel* CAssParser::Load(const std::string& modelFileName)
 {
 	logOutput.Print (LOG_MODEL, "Loading model: %s\n", modelFileName.c_str() );
-
+	std::string modelPath = modelFileName.substr(0, modelFileName.find_last_of('/'));
+    std::string modelFileNameNoPath = modelFileName.substr(modelPath.length()+1, modelFileName.length());
+    std::string modelName = modelFileNameNoPath.substr(0, modelFileNameNoPath.find_last_of('.'));
+    std::string modelExt = modelFileNameNoPath.substr(modelFileNameNoPath.find_last_of('.'), modelFileName.length());
 
     // LOAD METADATA
 	// Load the lua metafile. This contains properties unique to Spring models and must return a table
@@ -101,7 +105,7 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
 	CFileHandler* metaFile = new CFileHandler(metaFileName);
 	if (!metaFile->FileExists()) {
 	    // Try again without the model file extension
-        metaFileName = modelFileName.substr(0, modelFileName.find_last_of('.')) + ".lua";
+        metaFileName = modelPath + modelName + ".lua";
         metaFile = new CFileHandler(metaFileName);
 	}
 	LuaParser metaFileParser(metaFileName, SPRING_VFS_MOD_BASE, SPRING_VFS_ZIP);
@@ -145,19 +149,32 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
     model->scene = scene;
     //model->meta = &metaTable;
 
-    // Simplified dimensions used for rough calculations
-    model->relMidPos = metaTable.GetFloat3("midpos", float3(0.0f,0.0f,0.0f));
-    model->radius = metaTable.GetFloat("radius", 1.0f);
-    model->height = metaTable.GetFloat("height", 1.0f);
-    model->mins = metaTable.GetFloat3("mins", float3(0.0f,0.0f,0.0f));
-    model->maxs = metaTable.GetFloat3("maxs", float3(1.0f,1.0f,1.0f));
-
     // Assign textures
     // The S3O texture handler uses two textures.
     // The first contains diffuse color (RGB) and teamcolor (A)
     // The second contains glow (R), reflectivity (G) and 1-bit Alpha (A).
-    model->tex1 = metaTable.GetString("tex1", "default.png");
-    model->tex2 = metaTable.GetString("tex2", "");
+    if (metaTable.KeyExists("tex1")) {
+        model->tex1 = metaTable.GetString("tex1", "default.png");
+    } else {
+        // Search for a texture
+        std::vector<std::string> files = CFileHandler::FindFiles("unittextures/", modelName + ".*");
+        for(std::vector<std::string>::iterator fi = files.begin(); fi != files.end(); ++fi) {
+            std::string texPath = std::string(*fi);
+            model->tex1 = texPath.substr(texPath.find('/')+1, texPath.length());
+            break; // there can be only one!
+        }
+    }
+    if (metaTable.KeyExists("tex2")) {
+        model->tex2 = metaTable.GetString("tex2", "");
+    } else {
+        // Search for a texture
+        std::vector<std::string> files = CFileHandler::FindFiles("unittextures/", modelName + "2.*");
+        for(std::vector<std::string>::iterator fi = files.begin(); fi != files.end(); ++fi) {
+            std::string texPath = std::string(*fi);
+            model->tex2 = texPath.substr(texPath.find('/')+1, texPath.length());
+            break; // there can be only one!
+        }
+    }
     model->flipTexY = metaTable.GetBool("fliptextures", true); // Flip texture upside down
     model->invertAlpha = metaTable.GetBool("invertteamcolor", true); // Reverse teamcolor levels
 
@@ -171,6 +188,13 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
 
     // Update piece hierarchy based on metadata
     BuildPieceHierarchy( model );
+
+    // Simplified dimensions used for rough calculations
+    model->radius = metaTable.GetFloat("radius", model->radius);
+    model->height = metaTable.GetFloat("height", model->height);
+    model->relMidPos = metaTable.GetFloat3("midpos", model->relMidPos);
+    model->mins = metaTable.GetFloat3("mins", model->mins);
+    model->maxs = metaTable.GetFloat3("maxs", model->maxs);
 
     // Verbose logging of model properties
     logOutput.Print(LOG_MODEL_DETAIL, "model->name: %s", model->name.c_str());
@@ -186,8 +210,6 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
 
 SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& metaTable)
 {
-	logOutput.Print(LOG_PIECE, "Converting node '%s' to a piece (%d meshes).", node->mName.data, node->mNumMeshes);
-
 	// Create new piece
 	model->numobjects++;
 	SAssPiece* piece = new SAssPiece;
@@ -200,39 +222,48 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
 	} else {
         piece->name = "root"; // The real model root
 	}
+	logOutput.Print(LOG_PIECE, "Converting node '%s' to piece '%s' (%d meshes).", node->mName.data, piece->name.c_str(), node->mNumMeshes);
+
     // Load additional piece properties from metadata
     const LuaTable& pieceTable = metaTable.SubTable("pieces").SubTable(piece->name);
     if (pieceTable.IsValid()) logOutput.Print(LOG_PIECE, "Found metadata for piece '%s'", piece->name.c_str());
 
-    // Get piece transform data
+    // Process transforms
     float3 rotate, scale, offset;
 	aiVector3D _scale, _offset;
  	aiQuaternion _rotate;
 	node->mTransformation.Decompose(_scale,_rotate,_offset);
 
+	logOutput.Print(LOG_PIECE, "(%d:%s) Assimp offset (%f,%f,%f), rotate (%f,%f,%f), scale (%f,%f,%f)", model->numobjects, piece->name.c_str(),
+		_offset.x, _offset.y, _offset.z,
+		_rotate.x, _rotate.y, _rotate.z,
+		_scale.x, _scale.y, _scale.z
+	);
+
     offset = float3(_offset.x, _offset.y, _offset.z);
-	if (pieceTable.KeyExists("offset")) offset = pieceTable.GetFloat3("offset", ZeroVector);
+	if (pieceTable.KeyExists("offset")) offset = pieceTable.GetFloat3("offset", float3(0.0f, 0.0f, 0.0f));
     if (pieceTable.KeyExists("offsetx")) offset.x = pieceTable.GetFloat("offsetx", 0.0f);
     if (pieceTable.KeyExists("offsety")) offset.y = pieceTable.GetFloat("offsety", 0.0f);
     if (pieceTable.KeyExists("offsetz")) offset.z = pieceTable.GetFloat("offsetz", 0.0f);
 
     if (pieceTable.KeyExists("rotate")) {
-        rotate = pieceTable.GetFloat3("rotate", ZeroVector);
+        rotate = pieceTable.GetFloat3("rotate", float3(0.0f, 0.0f, 0.0f));
         DegreesToRadianAngles(rotate);
     } else {
         rotate = QuaternionToRadianAngles(_rotate);
+        rotate = float3(rotate.z, rotate.x, rotate.y);
     }
     if (pieceTable.KeyExists("rotatex")) rotate.x = pieceTable.GetFloat("rotatex", 0.0f) * DEGTORAD;
     if (pieceTable.KeyExists("rotatey")) rotate.y = pieceTable.GetFloat("rotatey", 0.0f) * DEGTORAD;
     if (pieceTable.KeyExists("rotatez")) rotate.z = pieceTable.GetFloat("rotatez", 0.0f) * DEGTORAD;
 
-    scale = float3(_scale.x, _scale.y, _scale.z);
+    scale = float3(_scale.x, _scale.z, _scale.y);
 	if (pieceTable.KeyExists("scale")) scale = pieceTable.GetFloat3("scale", float3(1.0f,1.0f,1.0f));
     if (pieceTable.KeyExists("scalex")) scale.x = pieceTable.GetFloat("scalex", 1.0f);
     if (pieceTable.KeyExists("scaley")) scale.y = pieceTable.GetFloat("scaley", 1.0f);
     if (pieceTable.KeyExists("scalez")) scale.z = pieceTable.GetFloat("scalez", 1.0f);
 
-	logOutput.Print(LOG_PIECE, "(%d:%s) Relative offset (%f,%f,%f), rotate (%f,%f,%f), scale (%f,%f,%f)", model->numobjects, node->mName.data,
+	logOutput.Print(LOG_PIECE, "(%d:%s) Relative offset (%f,%f,%f), rotate (%f,%f,%f), scale (%f,%f,%f)", model->numobjects, piece->name.c_str(),
 		offset.x, offset.y, offset.z,
 		rotate.x, rotate.y, rotate.z,
 		scale.x, scale.y, scale.z
@@ -338,6 +369,27 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
 		}
 	}
 
+    // Check if piece is special (ie, used to set Spring model properties)
+    if (strcmp(node->mName.data, "SpringHeight") == 0) {
+        // Set the model height to this nodes Z value
+        if (!metaTable.KeyExists("height")) {
+            model->height = piece->pos.z;
+            logOutput.Print (LOG_MODEL, "Model height of %f set by special node 'SpringHeight'", model->height);
+        }
+        return NULL;
+    }
+    if (strcmp(node->mName.data, "SpringRadius") == 0) {
+        if (!metaTable.KeyExists("midpos")) {
+            model->relMidPos = piece->pos;
+            logOutput.Print (LOG_MODEL, "Model midpos of (%f,%f,%f) set by special node 'SpringRadius'", model->relMidPos.x, model->relMidPos.y, model->relMidPos.z);
+        }
+        if (!metaTable.KeyExists("radius")) {
+            model->radius = piece->maxs.x;
+            logOutput.Print (LOG_MODEL, "Model radius of %f set by special node 'SpringRadius'", model->radius);
+        }
+        return NULL;
+    }
+
 	// update model min/max extents
 	model->mins.x = std::min(piece->mins.x, model->mins.x);
 	model->mins.y = std::min(piece->mins.y, model->mins.y);
@@ -364,19 +416,24 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
     } else {
         piece->parentName = "";
     }
+    //piece->parentName = "root"; // TODO REMOVE
+
+    logOutput.Print (LOG_PIECE, "Loaded model piece: %s with %d meshes\n", piece->name.c_str(), node->mNumMeshes );
+
+    // Verbose logging of piece properties
+    logOutput.Print(LOG_PIECE, "piece->name: %s", piece->name.c_str());
+    logOutput.Print(LOG_PIECE, "piece->parent: %s", piece->parentName.c_str());
 
 	// Recursively process all child pieces
 	for (unsigned int i = 0; i < node->mNumChildren; ++i) {
 		LoadPiece(model, node->mChildren[i], metaTable);
 	}
 
-	logOutput.Print (LOG_PIECE_DETAIL, "Loaded model piece: %s with %d meshes\n", piece->name.c_str(), node->mNumMeshes );
 	model->pieces[piece->name] = piece;
 	return piece;
 }
 
-
-//Because of metadata overrides we don't know the true hierarchy until all pieces have been loaded
+// Because of metadata overrides we don't know the true hierarchy until all pieces have been loaded
 void CAssParser::BuildPieceHierarchy( S3DModel* model )
 {
     // Loop through all pieces and create missing hierarchy info

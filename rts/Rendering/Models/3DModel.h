@@ -91,6 +91,8 @@ struct S3DModel
 
 	const aiScene* scene; //! For Assimp models. Contains imported data. NULL for s3o/3do.
 
+    S3DModel();
+    ~S3DModel();
     S3DModelPiece* FindPiece( std::string name );
 	inline void DrawStatic() const { rootobject->DrawStatic(); };
 };

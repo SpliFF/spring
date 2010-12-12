@@ -63,7 +63,7 @@ void CS3OTextureHandler::Update() {
 int CS3OTextureHandler::LoadS3OTextureNow(const std::string& tex1, const std::string& tex2, bool flipY, bool invertAlpha)
 {
 	GML_STDMUTEX_LOCK(model); // LoadS3OTextureNow
-	logOutput.Print(LOG_TEXTURE, "Load S3O texture now (Flip Y Axis: %s, Invert Team Alpha: %s)", 
+	logOutput.Print(LOG_TEXTURE, "Load S3O texture now (Flip Y Axis: %s, Invert Team Alpha: %s)",
 		flipY ? "yes" : "no",
 		invertAlpha ? "yes" : "no"
 	);
@@ -87,13 +87,13 @@ int CS3OTextureHandler::LoadS3OTextureNow(const std::string& tex1, const std::st
 			bm.mem[0] = 255; // file not found, make unit red
 		}
 	}
-		
+
 	if (flipY) bm.ReverseYAxis();
 	if (invertAlpha) bm.InvertAlpha();
 	tex.tex1 = bm.CreateTexture(true);
 	tex.tex1SizeX = bm.xsize;
 	tex.tex1SizeY = bm.ysize;
-	
+
 	logOutput.Print(LOG_TEXTURE, "Loading texture 2: %s", tex2.c_str());
 	tex.tex2=0;
 	tex.tex2SizeX = 0;

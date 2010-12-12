@@ -996,7 +996,7 @@ int LuaUnsyncedRead::GetSelectedUnitsSorted(lua_State* L)
 
 	lua_newtable(L);
 	map<int, vector<CUnit*> >::const_iterator mit;
-	for (mit = unitDefMap.begin(); mit != unitDefMap.end(); mit++) {
+	for (mit = unitDefMap.begin(); mit != unitDefMap.end(); ++mit) {
 		lua_pushnumber(L, mit->first); // push the UnitDef index
 		lua_newtable(L); {
 			const vector<CUnit*>& v = mit->second;
@@ -1037,7 +1037,7 @@ int LuaUnsyncedRead::GetSelectedUnitsCounts(lua_State* L)
 
 	lua_newtable(L);
 	map<int, int>::const_iterator mit;
-	for (mit = countMap.begin(); mit != countMap.end(); mit++) {
+	for (mit = countMap.begin(); mit != countMap.end(); ++mit) {
 		lua_pushnumber(L, mit->first);  // push the UnitDef index
 		lua_pushnumber(L, mit->second); // push the UnitDef unit count
 		lua_rawset(L, -3);
@@ -1117,13 +1117,13 @@ int LuaUnsyncedRead::GetMapDrawMode(lua_State* L)
 	CheckNoArgs(L, __FUNCTION__);
 	const CBaseGroundDrawer* gd = readmap->GetGroundDrawer();
 	switch (gd->drawMode) {
-		case CBaseGroundDrawer::drawNormal:      { HSTR_PUSH(L, "normal"     ); break; }
-		case CBaseGroundDrawer::drawHeight:      { HSTR_PUSH(L, "height"     ); break; }
-		case CBaseGroundDrawer::drawMetal:       { HSTR_PUSH(L, "metal"      ); break; }
-		case CBaseGroundDrawer::drawLos:         { HSTR_PUSH(L, "los"        ); break; }
-		case CBaseGroundDrawer::drawPathSquares: { HSTR_PUSH(L, "pathSquares"); break; }
-		case CBaseGroundDrawer::drawPathHeat:    { HSTR_PUSH(L, "pathHeat"   ); break; }
-		case CBaseGroundDrawer::drawPathCost:    { HSTR_PUSH(L, "pathCost"   ); break; }
+		case CBaseGroundDrawer::drawNormal:             { HSTR_PUSH(L, "normal"            ); break; }
+		case CBaseGroundDrawer::drawHeight:             { HSTR_PUSH(L, "height"            ); break; }
+		case CBaseGroundDrawer::drawMetal:              { HSTR_PUSH(L, "metal"             ); break; }
+		case CBaseGroundDrawer::drawLos:                { HSTR_PUSH(L, "los"               ); break; }
+		case CBaseGroundDrawer::drawPathTraversability: { HSTR_PUSH(L, "pathTraversability"); break; }
+		case CBaseGroundDrawer::drawPathHeat:           { HSTR_PUSH(L, "pathHeat"          ); break; }
+		case CBaseGroundDrawer::drawPathCost:           { HSTR_PUSH(L, "pathCost"          ); break; }
 	}
 	return 1;
 }
@@ -2047,7 +2047,7 @@ int LuaUnsyncedRead::GetGroupUnitsSorted(lua_State* L)
 
 	lua_newtable(L);
 	map<int, vector<CUnit*> >::const_iterator mit;
-	for (mit = unitDefMap.begin(); mit != unitDefMap.end(); mit++) {
+	for (mit = unitDefMap.begin(); mit != unitDefMap.end(); ++mit) {
 		lua_pushnumber(L, mit->first); // push the UnitDef index
 		lua_newtable(L); {
 			const vector<CUnit*>& v = mit->second;
@@ -2094,7 +2094,7 @@ int LuaUnsyncedRead::GetGroupUnitsCounts(lua_State* L)
 
 	lua_newtable(L);
 	map<int, int>::const_iterator mit;
-	for (mit = countMap.begin(); mit != countMap.end(); mit++) {
+	for (mit = countMap.begin(); mit != countMap.end(); ++mit) {
 		lua_pushnumber(L, mit->first);  // push the UnitDef index
 		lua_pushnumber(L, mit->second); // push the UnitDef unit count
 		lua_rawset(L, -3);

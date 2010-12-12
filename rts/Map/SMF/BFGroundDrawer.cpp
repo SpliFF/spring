@@ -170,18 +170,18 @@ bool CBFGroundDrawer::LoadMapShaders() {
 			smfShaderGLSL->SetUniform1i(4, 6); // specularTex (idx 4, texunit 6)
 			smfShaderGLSL->SetUniform2f(5, (gs->pwr2mapx * SQUARE_SIZE), (gs->pwr2mapy * SQUARE_SIZE));
 			smfShaderGLSL->SetUniform2f(6, (gs->mapx * SQUARE_SIZE), (gs->mapy * SQUARE_SIZE));
-			smfShaderGLSL->SetUniform4fv(9, const_cast<float*>(&mapInfo->light.sunDir[0]));
-			smfShaderGLSL->SetUniform3fv(14, const_cast<float*>(&mapInfo->light.groundAmbientColor[0]));
-			smfShaderGLSL->SetUniform3fv(15, const_cast<float*>(&mapInfo->light.groundSunColor[0]));
-			smfShaderGLSL->SetUniform3fv(16, const_cast<float*>(&mapInfo->light.groundSpecularColor[0]));
+			smfShaderGLSL->SetUniform4fv(9, &mapInfo->light.sunDir[0]);
+			smfShaderGLSL->SetUniform3fv(14, &mapInfo->light.groundAmbientColor[0]);
+			smfShaderGLSL->SetUniform3fv(15, &mapInfo->light.groundSunColor[0]);
+			smfShaderGLSL->SetUniform3fv(16, &mapInfo->light.groundSpecularColor[0]);
 			smfShaderGLSL->SetUniform1f(17, mapInfo->light.groundShadowDensity);
-			smfShaderGLSL->SetUniform3fv(18, const_cast<float*>(&mapInfo->water.minColor[0]));
-			smfShaderGLSL->SetUniform3fv(19, const_cast<float*>(&mapInfo->water.baseColor[0]));
-			smfShaderGLSL->SetUniform3fv(20, const_cast<float*>(&mapInfo->water.absorb[0]));
+			smfShaderGLSL->SetUniform3fv(18, &mapInfo->water.minColor[0]);
+			smfShaderGLSL->SetUniform3fv(19, &mapInfo->water.baseColor[0]);
+			smfShaderGLSL->SetUniform3fv(20, &mapInfo->water.absorb[0]);
 			smfShaderGLSL->SetUniform1i(21, 7); // splatDetailTex (idx 21, texunit 7)
 			smfShaderGLSL->SetUniform1i(22, 8); // splatDistrTex (idx 22, texunit 8)
-			smfShaderGLSL->SetUniform4fv(23, const_cast<float*>(&mapInfo->splats.texScales[0]));
-			smfShaderGLSL->SetUniform4fv(24, const_cast<float*>(&mapInfo->splats.texMults[0]));
+			smfShaderGLSL->SetUniform4fv(23, &mapInfo->splats.texScales[0]);
+			smfShaderGLSL->SetUniform4fv(24, &mapInfo->splats.texMults[0]);
 			smfShaderGLSL->SetUniform1i(25,  9); // skyReflectTex (idx 25, texunit 9)
 			smfShaderGLSL->SetUniform1i(26, 10); // skyReflectModTex (idx 26, texunit 10)
 
@@ -315,7 +315,7 @@ inline void CBFGroundDrawer::FindRange(int &xs, int &xe, const std::vector<fline
 	int xt0, xt1;
 	std::vector<fline>::const_iterator fli;
 
-	for (fli = left.begin(); fli != left.end(); fli++) {
+	for (fli = left.begin(); fli != left.end(); ++fli) {
 		float xtf = fli->base + fli->dir * y;
 		xt0 = (int)xtf;
 		xt1 = (int)(xtf + fli->dir * lod);
@@ -328,7 +328,7 @@ inline void CBFGroundDrawer::FindRange(int &xs, int &xe, const std::vector<fline
 		if (xt0 > xs)
 			xs = xt0;
 	}
-	for (fli = right.begin(); fli != right.end(); fli++) {
+	for (fli = right.begin(); fli != right.end(); ++fli) {
 		float xtf = fli->base + fli->dir * y;
 		xt0 = (int)xtf;
 		xt1 = (int)(xtf + fli->dir * lod);
@@ -363,7 +363,7 @@ inline void CBFGroundDrawer::DoDrawGroundRow(int bty) {
 
 	//! only process the necessary big squares in the x direction
 	int bigSquareSizeY = bty * bigSquareSize;
-	for (fli = left.begin(); fli != left.end(); fli++) {
+	for (fli = left.begin(); fli != left.end(); ++fli) {
 		x0 = fli->base + fli->dir * bigSquareSizeY;
 		x1 = x0 + fli->dir * bigSquareSize;
 
@@ -375,7 +375,7 @@ inline void CBFGroundDrawer::DoDrawGroundRow(int bty) {
 		if (x0 > sx)
 			sx = (int) x0;
 	}
-	for (fli = right.begin(); fli != right.end(); fli++) {
+	for (fli = right.begin(); fli != right.end(); ++fli) {
 		x0 = fli->base + fli->dir * bigSquareSizeY + bigSquareSize;
 		x1 = x0 + fli->dir * bigSquareSize;
 
@@ -1342,7 +1342,7 @@ void CBFGroundDrawer::SetupTextureUnits(bool drawReflection)
 			smfShaderGLSL->Enable();
 			smfShaderGLSL->SetUniform3fv(10, &camera->pos[0]);
 			smfShaderGLSL->SetUniformMatrix4fv(12, false, &shadowHandler->shadowMatrix.m[0]);
-			smfShaderGLSL->SetUniform4fv(13, const_cast<float*>(&(shadowHandler->GetShadowParams().x)));
+			smfShaderGLSL->SetUniform4fv(13, &(shadowHandler->GetShadowParams().x));
 
 			glActiveTexture(GL_TEXTURE5); glBindTexture(GL_TEXTURE_2D, map->GetNormalsTexture());
 			glActiveTexture(GL_TEXTURE6); glBindTexture(GL_TEXTURE_2D, map->GetSpecularTexture());
@@ -1505,7 +1505,6 @@ void CBFGroundDrawer::ResetTextureUnits(bool drawReflection)
 
 void CBFGroundDrawer::AddFrustumRestraint(const float3& side)
 {
-	fline temp;
 
 	// get vector for collision between frustum and horizontal plane
 	float3 b = UpVector.cross(side);
@@ -1514,6 +1513,7 @@ void CBFGroundDrawer::AddFrustumRestraint(const float3& side)
 		b.z = 0.0001f;
 
 	{
+		fline temp;
 		temp.dir = b.x / b.z;      // set direction to that
 		float3 c = b.cross(side);  // get vector from camera to collision line
 		float3 colpoint;           // a point on the collision line
@@ -1546,7 +1546,6 @@ void CBFGroundDrawer::UpdateCamRestraints(void)
 	AddFrustumRestraint(cam2->leftside);
 
 	// add restraint for maximum view distance
-	fline temp;
 	float3 side = cam2->forward;
 	float3 camHorizontal = cam2->forward;
 	camHorizontal.y = 0.0f;
@@ -1556,6 +1555,7 @@ void CBFGroundDrawer::UpdateCamRestraints(void)
 	float3 b = UpVector.cross(camHorizontal);
 
 	if (fabs(b.z) > 0.0001f) {
+		fline temp;
 		temp.dir = b.x / b.z;               // set direction to that
 		float3 c = b.cross(camHorizontal);  // get vector from camera to collision line
 		float3 colpoint;                    // a point on the collision line

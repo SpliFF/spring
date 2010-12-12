@@ -23,14 +23,12 @@ struct S3DModelPiece;
 struct LocalModel;
 struct LocalModelPiece;
 struct aiScene;
-class LuaTable;
 
 typedef std::map<std::string, S3DModelPiece*> PieceMap;
 
 struct S3DModelPiece {
 	std::string name;
 	int type;               //! MODELTYPE_*
-	//LuaTable* meta;
     S3DModel* model;
     std::string parentName;
 	S3DModelPiece* parent;
@@ -47,9 +45,9 @@ struct S3DModelPiece {
 	float3 maxs;
 	float3 goffset;   // wrt. root
 
-	float3 pos;
-	float3 rot; //! in radian
-	float3 scale;
+	float3 pos;			//! relative offset from parent
+	float3 rot;			//! relative rotation in radian
+	float3 scale;		//! not used yet
 
     S3DModelPiece();
 	~S3DModelPiece();
@@ -69,7 +67,6 @@ struct S3DModel
 {
 	int id; //! unsynced ID, starting with 1
     std::string name;
-    //LuaTable* meta;
 	int type;               //! MODELTYPE_*
 
 	// TODO: Move next 5 fields into S3DModelPiece for per-piece texturing (or remove entirely and put data into textures array)
@@ -88,9 +85,9 @@ struct S3DModel
 	float3 relMidPos;
 
 	S3DModelPiece* rootobject;  //! The piece at the base of the model hierarchy
-	PieceMap pieces;   //! Lookup table for pieces by name
+	PieceMap pieces;   			//! Lookup table for pieces by name
 
-	const aiScene* scene; //! For Assimp models. Contains imported data. NULL for s3o/3do.
+	const aiScene* scene; 		//! For Assimp models. Contains imported data. NULL for s3o/3do.
 
     S3DModel();
     ~S3DModel();
@@ -104,8 +101,8 @@ struct LocalModelPiece
 	// TODO: add (visibility) maxradius!
 
 	float3 pos;
-	float3 rot; //! in radian
-	float3 scale;
+	float3 rot; 	//! in radian
+	float3 scale;	//! not used yet
 
 	bool updated; //FIXME unused?
 	bool visible;
@@ -130,23 +127,24 @@ struct LocalModelPiece
 	void ApplyTransform() const;
 	void GetPiecePosIter(CMatrix44f* mat) const;
 	float3 GetPos() const;
-	CMatrix44f GetMatrix() const;
 	float3 GetDirection() const;
-	bool GetEmitDirPos(float3 &pos, float3 &dir) const;
+	bool GetEmitDirPos(float3& pos, float3& dir) const;
+	CMatrix44f GetMatrix() const;
 };
 
 struct LocalModel
 {
-	LocalModel() : type(-1), lodCount(0) {};
+	LocalModel() : type(-1), lodCount(0) {}
 	~LocalModel();
 
 	int type;  //! MODELTYPE_*
-
-	std::vector<LocalModelPiece*> pieces;
 	unsigned int lodCount;
 
-	inline void Draw() const { pieces[0]->Draw(); };
-	inline void DrawLOD(unsigned int lod) const { if (lod <= lodCount) pieces[0]->DrawLOD(lod);};
+	std::vector<LocalModelPiece*> pieces;
+	LocalModelPiece* GetRoot() { return pieces[0]; }
+
+	inline void Draw() const { pieces[0]->Draw(); }
+	inline void DrawLOD(unsigned int lod) const { if (lod <= lodCount) pieces[0]->DrawLOD(lod); }
 	void SetLODCount(unsigned int count);
 
 	//! raw forms, the piecenum must be valid
@@ -154,7 +152,7 @@ struct LocalModel
 	float3 GetRawPiecePos(int piecenum) const;
 	CMatrix44f GetRawPieceMatrix(int piecenum) const;
 	float3 GetRawPieceDirection(int piecenum) const;
-	void GetRawEmitDirPos(int piecenum, float3 &pos, float3 &dir) const;
+	void GetRawEmitDirPos(int piecenum, float3& pos, float3& dir) const;
 };
 
 

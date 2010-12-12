@@ -35,6 +35,7 @@
 #include "Rendering/InMapDraw.h"
 #include "Rendering/Screenshot.h"
 #include "Rendering/ShadowHandler.h"
+#include "Rendering/UnitDrawer.h"
 #include "Rendering/VerticalSync.h"
 #include "Lua/LuaOpenGL.h"
 #include "Sim/Misc/TeamHandler.h"
@@ -288,11 +289,11 @@ bool CGame::ActionPressed(const Action& action,
 		const bool cheating           = gs->cheatEnabled;
 		const bool hasArgs            = (action.extra.size() > 0);
 		const std::vector<std::string> &args = _local_strSpaceTokenize(action.extra);
-		size_t skirmishAIId           = 0; // will only be used if !badArgs
 		const bool singlePlayer       = (playerHandler->ActivePlayers() <= 1);
 		const std::string actionName  = cmd.substr(2);
 
 		if (hasArgs) {
+			size_t skirmishAIId           = 0; // will only be used if !badArgs
 			bool share = false;
 			int teamToKillId         = -1;
 			int teamToReceiveUnitsId = -1;
@@ -913,11 +914,11 @@ bool CGame::ActionPressed(const Action& action,
 		gd->ToggleRadarAndJammer();
 	}
 	else if (cmd == "showmetalmap") {
-		gd->SetMetalTexture(readmap->metalMap->metalMap,&readmap->metalMap->extractionMap.front(),readmap->metalMap->metalPal,false);
+		gd->SetMetalTexture(readmap->metalMap);
 	}
 
-	else if (cmd == "showpathsquares") {
-		gd->TogglePathSquaresTexture();
+	else if (cmd == "showpathtraversability") {
+		gd->TogglePathTraversabilityTexture();
 	}
 	else if (cmd == "showpathheat") {
 		if (gs->cheatEnabled) {

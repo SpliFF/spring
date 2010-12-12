@@ -95,6 +95,7 @@
 #include "Sim/Misc/SmoothHeightMesh.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Misc/Wind.h"
+#include "Sim/Misc/ResourceHandler.h"
 #include "Sim/MoveTypes/MoveInfo.h"
 #include "Sim/Path/IPathManager.h"
 #include "Sim/Projectiles/Projectile.h"
@@ -104,6 +105,7 @@
 #include "Sim/Units/UnitDefHandler.h"
 #include "Sim/Units/CommandAI/LineDrawer.h"
 #include "Sim/Units/Groups/GroupHandler.h"
+#include "Sim/Units/UnitLoader.h"
 #include "Sim/MoveTypes/MoveType.h"
 #include "Sim/Projectiles/ExplosionGenerator.h"
 #include "Sim/Weapons/Weapon.h"
@@ -132,6 +134,7 @@
 #include "System/FPUCheck.h"
 #include "System/NetProtocol.h"
 #include "System/SpringApp.h"
+#include "System/Util.h"
 #include "System/FileSystem/ArchiveScanner.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/FileSystem/VFSHandler.h"
@@ -284,6 +287,9 @@ CGame::CGame(const std::string& mapname, const std::string& modName, ILoadSaveHa
 	CLuaHandle::SetModUICtrl(!!configHandler->Get("LuaModUICtrl", 1));
 
 	modInfo.Init(modName.c_str());
+	if (!mapInfo) {
+		mapInfo = new CMapInfo(gameSetup->MapFile(), gameSetup->mapName);
+	}
 
 	if (!sideParser.Load()) {
 		throw content_error(sideParser.GetErrorLog());
@@ -308,7 +314,6 @@ CGame::~CGame()
 	CLuaRules::FreeHandler();
 	LuaOpenGL::Free();
 	heightMapTexture.Kill();
-	SafeDelete(gameServer);
 
 	eoh->PreDestroy();
 	CEngineOutHandler::Destroy();
@@ -346,7 +351,6 @@ CGame::~CGame()
 	SafeDelete(tooltip);
 	SafeDelete(keyBindings);
 	SafeDelete(keyCodes);
-	ISound::Shutdown();
 	SafeDelete(selectionKeys);
 	SafeDelete(mouse);
 	SafeDelete(camHandler);
@@ -354,6 +358,8 @@ CGame::~CGame()
 	SafeDelete(shadowHandler);
 	SafeDelete(moveinfo);
 	SafeDelete(unitDefHandler);
+	SafeDelete(unitLoader);
+	CResourceHandler::FreeInstance();
 	SafeDelete(weaponDefHandler);
 	SafeDelete(damageArrayHandler);
 	SafeDelete(vfsHandler);
@@ -378,6 +384,8 @@ CGame::~CGame()
 	CCategoryHandler::RemoveInstance();
 	CColorMap::DeleteColormaps();
 	SafeDelete(cubeMapHandler);
+
+	game = NULL;
 }
 
 
@@ -417,7 +425,7 @@ void CGame::LoadDefs()
 
 		// run the parser
 		if (!defsParser->Execute()) {
-			throw content_error(defsParser->GetErrorLog());
+			throw content_error("Defs-Parser: " + defsParser->GetErrorLog());
 		}
 		const LuaTable root = defsParser->GetRoot();
 		if (!root.IsValid()) {
@@ -459,7 +467,6 @@ void CGame::LoadSimulation(const std::string& mapname)
 
 	loadscreen->SetLoadMessage("Parsing Map Information");
 
-	const_cast<CMapInfo*>(mapInfo)->Load();
 	readmap = CReadMap::LoadMap(mapname);
 	groundBlockingObjectMap = new CGroundBlockingObjectMap(gs->mapSquares);
 
@@ -489,6 +496,7 @@ void CGame::LoadSimulation(const std::string& mapname)
 	weaponDefHandler = new CWeaponDefHandler();
 	loadscreen->SetLoadMessage("Loading Unit Definitions");
 	unitDefHandler = new CUnitDefHandler();
+	unitLoader = new CUnitLoader();
 
 	uh = new CUnitHandler();
 	ph = new CProjectileHandler();
@@ -1738,9 +1746,7 @@ void CGame::SimFrame() {
 		m_validateAllAllocUnits();
 #endif
 
-	if (luaUI)    { luaUI->GameFrame(gs->frameNum); }
-	if (luaGaia)  { luaGaia->GameFrame(gs->frameNum); }
-	if (luaRules) { luaRules->GameFrame(gs->frameNum); }
+	eventHandler.GameFrame(gs->frameNum);
 
 	gs->frameNum++;
 
@@ -1915,7 +1921,7 @@ void CGame::MakeMemDump(void)
 	}
 
 	file << "Frame " << gs->frameNum <<"\n";
-	for (std::list<CUnit*>::iterator usi = uh->activeUnits.begin(); usi != uh->activeUnits.end(); usi++) {
+	for (std::list<CUnit*>::iterator usi = uh->activeUnits.begin(); usi != uh->activeUnits.end(); ++usi) {
 		CUnit* u = *usi;
 		file << "Unit " << u->id << "\n";
 		file << "  xpos " << u->pos.x << " ypos " << u->pos.y << " zpos " << u->pos.z << "\n";
@@ -2313,15 +2319,6 @@ void CGame::SelectCycle(const string& command)
 }
 
 
-static unsigned char GetLuaColor(const LuaTable& tbl, int channel, unsigned char orig)
-{
-	const float fOrig = (float)orig / 255.0f;
-	float luaVal = tbl.GetFloat(channel, fOrig);
-	luaVal = std::max(0.0f, std::min(1.0f, luaVal));
-	return (unsigned char)(luaVal * 255.0f);
-}
-
-
 //FIXME remove!
 void CGame::ReColorTeams()
 {
@@ -2331,79 +2328,6 @@ void CGame::ReColorTeams()
 		team->origColor[1] = team->color[1];
 		team->origColor[2] = team->color[2];
 		team->origColor[3] = team->color[3];
-	}
-
-	{
-		// scoped so that 'fh' disappears before luaParser uses the file
-		CFileHandler fh("teamcolors.lua", SPRING_VFS_RAW);
-		if (!fh.FileExists()) {
-			return;
-		}
-	}
-
-	LuaParser luaParser("teamcolors.lua", SPRING_VFS_RAW, SPRING_VFS_RAW_FIRST);
-
-	luaParser.AddInt("myPlayer", gu->myPlayerNum);
-
-	luaParser.AddString("modName",      modInfo.humanName);
-	luaParser.AddString("modShortName", modInfo.shortName);
-	luaParser.AddString("modVersion",   modInfo.version);
-
-	luaParser.AddString("mapName",      mapInfo->map.name);
-	luaParser.AddString("mapHumanName", mapInfo->map.humanName);
-
-	luaParser.GetTable("teams");
-	for(int t = 0; t < teamHandler->ActiveTeams(); ++t) {
-		luaParser.GetTable(t); {
-			const CTeam* team = teamHandler->Team(t);
-			const unsigned char* color = teamHandler->Team(t)->color;
-			luaParser.AddInt("allyTeam", teamHandler->AllyTeam(t));
-			luaParser.AddBool("gaia",    team->gaia);
-			luaParser.AddInt("leader",   team->leader);
-			luaParser.AddString("side",  team->side);
-			luaParser.GetTable("color"); {
-				luaParser.AddFloat(1, float(color[0]) / 255.0f);
-				luaParser.AddFloat(2, float(color[1]) / 255.0f);
-				luaParser.AddFloat(3, float(color[2]) / 255.0f);
-				luaParser.AddFloat(4, float(color[3]) / 255.0f);
-			}
-			luaParser.EndTable(); // color
-		}
-		luaParser.EndTable(); // team#
-	}
-	luaParser.EndTable(); // teams
-
-	luaParser.GetTable("players");
-	for(int p = 0; p < playerHandler->ActivePlayers(); ++p) {
-		luaParser.GetTable(p); {
-			const CPlayer* player = playerHandler->Player(p);
-			luaParser.AddString("name",     player->name);
-			luaParser.AddInt("team",        player->team);
-			luaParser.AddBool("active",     player->active);
-			luaParser.AddBool("spectating", player->spectator);
-		}
-		luaParser.EndTable(); // player#
-	}
-	luaParser.EndTable(); // players
-
-	if (!luaParser.Execute()) {
-		logOutput.Print("teamcolors.lua: luaParser.Execute() failed\n");
-		return;
-	}
-	LuaTable root = luaParser.GetRoot();
-	if (!root.IsValid()) {
-		logOutput.Print("teamcolors.lua: root table is not valid\n");
-	}
-
-	for (int t = 0; t < teamHandler->ActiveTeams(); ++t) {
-		LuaTable teamTable = root.SubTable(t);
-		if (teamTable.IsValid()) {
-			unsigned char* color = teamHandler->Team(t)->color;
-			color[0] = GetLuaColor(teamTable, 1, color[0]);
-			color[1] = GetLuaColor(teamTable, 2, color[1]);
-			color[2] = GetLuaColor(teamTable, 3, color[2]);
-			// do not adjust color[3] -- alpha
-		}
 	}
 }
 

@@ -228,9 +228,7 @@ void C3DModelLoader::CreateLocalModelPieces(S3DModelPiece* piece, LocalModel* lm
 	lmp.pos       =  piece->pos;
 	lmp.rot       =  piece->rot;
 	lmp.scale     =  piece->scale;
-
-	//logOutput.Print("Create CollisionVolume");
-	lmp.colvol    = new CollisionVolume(piece->colvol);
+	lmp.colvol    =  new CollisionVolume(piece->colvol);
 
 	//logOutput.Print("Setup childs (childs %d)", piece->childs.size());
 	lmp.childs.reserve(piece->childs.size());

@@ -169,7 +169,6 @@ void CGame::ActionReceived(const Action& action, int playernum)
 
 		int amount = 1;
 		int team = playerHandler->Player(playernum)->team;
-		int allyteam = -1;
 
 		int amountArgIdx = -1;
 		int teamArgIdx = -1;
@@ -228,9 +227,9 @@ void CGame::ActionReceived(const Action& action, int playernum)
 				float3 pos2 = float3(posx, pos.y, posz);
 				const UnitDef* ud = unitDefHandler->GetUnitDefByID(a);
 				if (ud) {
-					const CUnit* unit = unitLoader.LoadUnit(ud, pos2, team, false, 0, NULL);
+					const CUnit* unit = unitLoader->LoadUnit(ud, pos2, team, false, 0, NULL);
 					if (unit) {
-						unitLoader.FlattenGround(unit);
+						unitLoader->FlattenGround(unit);
 					}
 				}
 			}
@@ -266,10 +265,10 @@ void CGame::ActionReceived(const Action& action, int playernum)
 						float minposx = minpos.x + x * xsize * SQUARE_SIZE;
 						float minposz = minpos.z + z * zsize * SQUARE_SIZE;
 						const float3 upos(minposx, minpos.y, minposz);
-						const CUnit* unit = unitLoader.LoadUnit(unitDef, upos, team, false, 0, NULL);
+						const CUnit* unit = unitLoader->LoadUnit(unitDef, upos, team, false, 0, NULL);
 
 						if (unit) {
-							unitLoader.FlattenGround(unit);
+							unitLoader->FlattenGround(unit);
 						}
 						--total;
 					}
@@ -277,6 +276,7 @@ void CGame::ActionReceived(const Action& action, int playernum)
 
 				logOutput.Print("Giving %i %s to team %i", numRequestedUnits, unitName.c_str(), team);
 			} else {
+				int allyteam = -1;
 				if (teamArgIdx < 0) {
 					team = -1; // default to world features
 					allyteam = -1;

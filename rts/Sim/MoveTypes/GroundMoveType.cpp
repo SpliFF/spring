@@ -46,7 +46,6 @@
 CR_BIND_DERIVED(CGroundMoveType, AMoveType, (NULL));
 
 CR_REG_METADATA(CGroundMoveType, (
-		CR_MEMBER(baseTurnRate),
 		CR_MEMBER(turnRate),
 		CR_MEMBER(accRate),
 		CR_MEMBER(decRate),
@@ -116,7 +115,6 @@ std::vector<int2> CGroundMoveType::lineTable[LINETABLE_SIZE][LINETABLE_SIZE];
 CGroundMoveType::CGroundMoveType(CUnit* owner):
 	AMoveType(owner),
 
-	baseTurnRate(0.1f),
 	turnRate(0.1f),
 	accRate(0.01f),
 	decRate(0.01f),
@@ -127,7 +125,7 @@ CGroundMoveType::CGroundMoveType(CUnit* owner):
 	deltaSpeed(0.0f),
 	deltaHeading(0),
 
-	flatFrontDir(1, 0, 0),
+	flatFrontDir(0.0f, 0.0, 1.0f),
 	pathId(0),
 	goalRadius(0),
 
@@ -223,6 +221,7 @@ void CGroundMoveType::Update()
 
 	ASSERT_SYNCED_FLOAT3(owner->pos);
 
+	const UnitDef* ud = owner->unitDef;
 
 	if (owner->stunned || owner->beingBuilt) {
 		owner->script->StopMoving();
@@ -255,7 +254,7 @@ void CGroundMoveType::Update()
 						// over several frames (eg. to maneuver around an
 						// obstacle), which unlike actual immobilization
 						// does not count as an ETA failure
-						etaFailures = std::min(65536, int(etaFailures + 1));
+						etaFailures = std::min(SHORTINT_MAXVALUE, int(etaFailures + 1));
 
 						#if (DEBUG_OUTPUT == 1)
 						logOutput.Print(
@@ -267,15 +266,15 @@ void CGroundMoveType::Update()
 				}
 
 				// Set direction to waypoint.
-				float3 waypointDir = waypoint - owner->pos;
-					waypointDir.y = 0;
-					waypointDir.SafeNormalize();
+				waypointDir = waypoint - owner->pos;
+				waypointDir.y = 0.0f;
+				waypointDir.SafeNormalize();
 
 				ASSERT_SYNCED_FLOAT3(waypointDir);
 
 				const float3 wpDirInv = -waypointDir;
 				const float3 wpPosTmp = owner->pos + wpDirInv;
-				const bool   wpBehind = (waypointDir.dot(owner->frontdir) < 0.0f);
+				const bool   wpBehind = (waypointDir.dot(flatFrontDir) < 0.0f);
 
 				if (!haveFinalWaypoint) {
 					GetNextWaypoint();
@@ -316,8 +315,17 @@ void CGroundMoveType::Update()
 					if (!moreCommands && startBreaking) {
 						wantedSpeed = std::min(wantedSpeed, fastmath::apxsqrt(currentDistanceToWaypoint * -owner->mobility->maxBreaking));
 					}
+					if (waypointDir.SqLength() > 0.1f) {
+						const float reqTurnAngle = streflop::acosf(waypointDir.dot(flatFrontDir)) * (180.0f / PI);
+						const float maxTurnAngle = (turnRate / SPRING_CIRCLE_DIVS) * 360.0f;
+						const float reducedSpeed = (maxSpeed * 2.0f) * (maxTurnAngle / reqTurnAngle);
 
-					if (owner->unitDef->turnInPlace) {
+						if (!wantReverse && reqTurnAngle > maxTurnAngle) {
+							wantedSpeed = std::min(wantedSpeed, std::max(ud->turnInPlaceSpeedLimit, reducedSpeed));
+						}
+					}
+
+					if (ud->turnInPlace) {
 						if (wantReverse) {
 							wantedSpeed *= std::max(0.0f, std::min(1.0f, avoidVec.dot(-owner->frontdir) + 0.1f));
 						} else {
@@ -349,7 +357,7 @@ void CGroundMoveType::Update()
 		idling = (owner->speed.SqLength() < 1.0f);
 		oldPos = owner->pos;
 
-		if (owner->unitDef->leaveTracks && (lastTrackUpdate < gs->frameNum - 7) &&
+		if (ud->leaveTracks && (lastTrackUpdate < gs->frameNum - 7) &&
 			((owner->losStatus[gu->myAllyTeam] & LOS_INLOS) || gu->spectatingFullView)) {
 			lastTrackUpdate = gs->frameNum;
 			groundDecals->UnitMoved(owner);
@@ -370,7 +378,7 @@ void CGroundMoveType::SlowUpdate()
 
 	if (progressState == Active) {
 		if (pathId != 0) {
-			if (etaFailures > (65536 / turnRate)) {
+			if (etaFailures > (SHORTINT_MAXVALUE / turnRate)) {
 				// we have a path but are not moving (based on the ETA failure count)
 				#if (DEBUG_OUTPUT == 1)
 				logOutput.Print("[CGMT::SU] unit %i has path %i but %i ETA failures", owner->id, pathId, etaFailures);
@@ -537,13 +545,12 @@ void CGroundMoveType::SetDeltaSpeed(bool wantReverse)
 				// GetNextWaypoint() often is sufficient prevention
 				// If current waypoint is the last one and it's near,
 				// hit the brakes a bit more.
+				const UnitDef* ud = owner->unitDef;
 				const float finalGoalSqDist = owner->pos.SqDistance2D(goalPos);
-				const float tipSqDist = owner->unitDef->turnInPlaceDistance * owner->unitDef->turnInPlaceDistance;
-				const bool unitdefInPlace = (owner->unitDef->turnInPlace
-						&& (tipSqDist > finalGoalSqDist
-						|| owner->unitDef->turnInPlaceDistance <= 0.0f));
+				const float tipSqDist = ud->turnInPlaceDistance * ud->turnInPlaceDistance;
+				const bool inPlaceTurn = (ud->turnInPlace && (tipSqDist > finalGoalSqDist || ud->turnInPlaceDistance <= 0.0f));
 
-				if (unitdefInPlace || currentSpeed < owner->unitDef->turnInPlaceSpeedLimit / GAME_SPEED) {
+				if (inPlaceTurn || (currentSpeed < ud->turnInPlaceSpeedLimit)) {
 					// keep the turn mostly in-place
 					wSpeed = turnSpeed;
 				} else {
@@ -648,7 +655,7 @@ void CGroundMoveType::ChangeHeading(short wantedHeading) {
 	}
 
 	flatFrontDir = owner->frontdir;
-	flatFrontDir.y = 0;
+	flatFrontDir.y = 0.0f;
 	flatFrontDir.Normalize();
 }
 
@@ -952,14 +959,11 @@ void CGroundMoveType::CheckCollisionSkid(void)
 					- owner->updir*owner->relMidPos.y
 					- owner->rightdir*owner->relMidPos.x;
 				owner->speed+=dif*(impactSpeed*1.8f);
-				if(impactSpeed > ud->minCollisionSpeed
-					&& ud->minCollisionSpeed >= 0)
-				{
-					owner->DoDamage(DamageArray(impactSpeed*owner->mass*0.2f),
-						0, ZeroVector);
+
+				if (impactSpeed > ud->minCollisionSpeed && ud->minCollisionSpeed >= 0) {
+					owner->DoDamage(DamageArray(impactSpeed * owner->mass * 0.2f), 0, ZeroVector);
 				}
-				u->DoDamage(DamageArray(impactSpeed*owner->mass*0.2f),
-					0, -dif*impactSpeed);
+				u->DoDamage(DamageArray(impactSpeed * owner->mass * 0.2f), -dif * impactSpeed);
 			}
 		}
 	}
@@ -1035,17 +1039,18 @@ float3 CGroundMoveType::ObstacleAvoidance(float3 desiredDir) {
 			const int ltx = wsx - moveSquareX + (LINETABLE_SIZE / 2);
 			const int lty = wsy - moveSquareY + (LINETABLE_SIZE / 2);
 
+			static const unsigned int blockBits =
+				CMoveMath::BLOCK_STRUCTURE |
+				CMoveMath::BLOCK_MOBILE_BUSY;
+			const MoveData& udMoveData = *owner->unitDef->movedata;
+
 			if (ltx >= 0 && ltx < LINETABLE_SIZE && lty >= 0 && lty < LINETABLE_SIZE) {
 				for (std::vector<int2>::iterator li = lineTable[lty][ltx].begin(); li != lineTable[lty][ltx].end(); ++li) {
 					const int x = (moveSquareX + li->x) * 2;
 					const int y = (moveSquareY + li->y) * 2;
-					const int blockBits = CMoveMath::BLOCK_STRUCTURE |
-					                      CMoveMath::BLOCK_TERRAIN   |
-					                      CMoveMath::BLOCK_MOBILE_BUSY;
-					const MoveData& moveData = *owner->unitDef->movedata;
 
-					if ((moveData.moveMath->IsBlocked(moveData, x, y) & blockBits) ||
-					    (moveData.moveMath->SpeedMod(moveData, x, y) <= 0.01f)) {
+					if ((udMoveData.moveMath->IsBlocked(udMoveData, x, y) & blockBits) ||
+					    (udMoveData.moveMath->SpeedMod(udMoveData, x, y) <= 0.01f)) {
 
 						// one of the potential avoidance squares is blocked
 						etaFailures++;
@@ -1075,7 +1080,7 @@ float3 CGroundMoveType::ObstacleAvoidance(float3 desiredDir) {
 			const vector<CSolidObject*> &nearbyObjects = qf->GetSolidsExact(owner->pos, speedf * 35 + 30 + owner->xsize / 2);
 			vector<CSolidObject*> objectsOnPath;
 
-			for (vector<CSolidObject*>::const_iterator oi = nearbyObjects.begin(); oi != nearbyObjects.end(); oi++) {
+			for (vector<CSolidObject*>::const_iterator oi = nearbyObjects.begin(); oi != nearbyObjects.end(); ++oi) {
 				CSolidObject* o = *oi;
 				CMoveMath* moveMath = moveData->moveMath;
 
@@ -1270,10 +1275,13 @@ void CGroundMoveType::GetNextWaypoint()
 		// and pass it without slowing down)
 		// note that we take the DIAMETER of the circle
 		// to prevent sine-like "snaking" trajectories
-		const float turnFrames = 65536 / turnRate;
-		const float turnRadius = (currentSpeed * turnFrames) / (PI + PI);
+		const float turnFrames = SPRING_CIRCLE_DIVS / turnRate;
+		const float turnRadius = (owner->speed.Length() * turnFrames) / (PI + PI);
 
 		if ((currentDistanceToWaypoint) > (turnRadius * 2.0f)) {
+			return;
+		}
+		if (currentDistanceToWaypoint > MIN_WAYPOINT_DISTANCE && waypointDir.dot(flatFrontDir) >= 0.995f) {
 			return;
 		}
 	}
@@ -1831,6 +1839,11 @@ void CGroundMoveType::TestNewTerrainSquare(void)
 			int nwsy = (int) nextWaypoint.z / (MIN_WAYPOINT_DISTANCE) - moveSquareY;
 			int numIter = 0;
 
+			static const unsigned int blockBits =
+				CMoveMath::BLOCK_STRUCTURE |
+				CMoveMath::BLOCK_MOBILE |
+				CMoveMath::BLOCK_MOBILE_BUSY;
+
 			while ((nwsx * nwsx + nwsy * nwsy) < LINETABLE_SIZE && !haveFinalWaypoint && pathId) {
 				const int ltx = nwsx + LINETABLE_SIZE / 2;
 				const int lty = nwsy + LINETABLE_SIZE / 2;
@@ -1840,11 +1853,8 @@ void CGroundMoveType::TestNewTerrainSquare(void)
 					for (std::vector<int2>::iterator li = lineTable[lty][ltx].begin(); li != lineTable[lty][ltx].end(); ++li) {
 						const int x = (moveSquareX + li->x) * 2;
 						const int y = (moveSquareY + li->y) * 2;
-						static const int blockMask =
-							(CMoveMath::BLOCK_STRUCTURE | CMoveMath::BLOCK_TERRAIN |
-							CMoveMath::BLOCK_MOBILE | CMoveMath::BLOCK_MOBILE_BUSY);
 
-						if ((movemath->IsBlocked(md, x, y) & blockMask) ||
+						if ((movemath->IsBlocked(md, x, y) & blockBits) ||
 							movemath->SpeedMod(md, x, y) <= 0.01f) {
 							wpOk = false;
 							break;
@@ -2048,7 +2058,9 @@ void CGroundMoveType::UpdateOwnerPos(bool wantReverse)
 
 		// note: currentSpeed can be out of sync with
 		// owner->speed.Length(), eg. when in front of
-		// an obstacle
+		// an obstacle ==> bad for MANY reasons, such
+		// as too-quick consumption of waypoints when
+		// a new path is requested
 		currentSpeed += deltaSpeed;
 		owner->pos += (flatFrontDir * currentSpeed * (reversing? -1.0f: 1.0f));
 
@@ -2060,7 +2072,7 @@ void CGroundMoveType::UpdateOwnerPos(bool wantReverse)
 	}
 }
 
-bool CGroundMoveType::WantReverse(const float3& waypointDir) const
+bool CGroundMoveType::WantReverse(const float3& waypointDir2D) const
 {
 	if (!canReverse) {
 		return false;
@@ -2070,11 +2082,11 @@ bool CGroundMoveType::WantReverse(const float3& waypointDir) const
 	const float waypointDist  = waypointDif.Length();                                           // in elmos
 	const float waypointFETA  = (waypointDist / maxSpeed);                                      // in frames (simplistic)
 	const float waypointRETA  = (waypointDist / maxReverseSpeed);                               // in frames (simplistic)
-	const float waypointDirDP = waypointDir.dot(owner->frontdir);
+	const float waypointDirDP = waypointDir2D.dot(owner->frontdir);
 	const float waypointAngle = std::max(-1.0f, std::min(1.0f, waypointDirDP));                 // prevent NaN's
 	const float turnAngleDeg  = streflop::acosf(waypointAngle) * (180.0f / PI);                 // in degrees
-	const float turnAngleSpr  = (turnAngleDeg / 360.0f) * 65536.0f;                             // in "headings"
-	const float revAngleSpr   = 32768.0f - turnAngleSpr;                                        // 180 deg - angle
+	const float turnAngleSpr  = (turnAngleDeg / 360.0f) * SPRING_CIRCLE_DIVS;                   // in "headings"
+	const float revAngleSpr   = SHORTINT_MAXVALUE - turnAngleSpr;                               // 180 deg - angle
 
 	// units start accelerating before finishing the turn, so subtract something
 	const float turnTimeMod   = 5.0f;

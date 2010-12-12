@@ -61,7 +61,7 @@ class CGameServer
 {
 	friend class CCregLoadSaveHandler;     //For initialize server state after load
 public:
-	CGameServer(int hostport, bool onlyLocal, const GameData* const gameData, const CGameSetup* const setup);
+	CGameServer(int hostport, const GameData* const gameData, const CGameSetup* const setup);
 	~CGameServer();
 
 	void AddLocalClient(const std::string& myName, const std::string& myVersion);
@@ -133,10 +133,10 @@ private:
 
 	void AddToPacketCache(boost::shared_ptr<const netcode::RawPacket> &pckt);
 
-	void AdjustPlayerNumber(const unsigned char msg, unsigned char &player);
+	bool AdjustPlayerNumber(netcode::RawPacket *buf, int pos, int val = -1);
 	void UpdatePlayerNumberMap();
 
-	float GetDemoTime();
+	float GetDemoTime() const ;
 
 	/////////////////// game status variables ///////////////////
 

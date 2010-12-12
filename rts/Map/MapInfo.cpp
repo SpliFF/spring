@@ -33,13 +33,7 @@ CMapInfo::CMapInfo(const std::string& _mapInfoFile, const string& mapName) : map
 		throw content_error("MapInfo: " + parser->GetErrorLog());
 	}
 
-	resRoot = NULL;
-}
-
-void CMapInfo::Load()
-{
-	LuaParser resParser("gamedata/resources.lua",
-	                    SPRING_VFS_MOD_BASE, SPRING_VFS_ZIP);
+	LuaParser resParser("gamedata/resources.lua", SPRING_VFS_MOD_BASE, SPRING_VFS_ZIP);
 	if (!resParser.Execute()) {
 		logOutput.Print(resParser.GetErrorLog());
 	}
@@ -73,10 +67,10 @@ void CMapInfo::ReadGlobal()
 {
 	const LuaTable topTable = parser->GetRoot();
 
-	map.humanName    = topTable.GetString("description", map.name);
+	map.description  = topTable.GetString("description", map.name);
 	map.author       = topTable.GetString("author", "");
 
-	map.hardness      = std::max(0.001f, topTable.GetFloat("maphardness", 100.0f));
+	map.hardness      = topTable.GetFloat("maphardness", 100.0f);
 	map.notDeformable = topTable.GetBool("notDeformable", false);
 
 	map.gravity = topTable.GetFloat("gravity", 130.0f);
@@ -90,10 +84,10 @@ void CMapInfo::ReadGlobal()
 	map.voidWater = topTable.GetBool("voidWater", false);
 
 	// clamps
-	map.hardness        = max(0.0f, map.hardness);
-	map.tidalStrength   = max(0.0f, map.tidalStrength);
-	map.maxMetal        = max(0.0f, map.maxMetal);
-	map.extractorRadius = max(0.0f, map.extractorRadius);
+	map.hardness        = max(0.001f, map.hardness);
+	map.tidalStrength   = max(0.000f, map.tidalStrength);
+	map.maxMetal        = max(0.000f, map.maxMetal);
+	map.extractorRadius = max(0.000f, map.extractorRadius);
 }
 
 
@@ -335,8 +329,7 @@ void CMapInfo::ReadSm3()
 
 void CMapInfo::ReadTerrainTypes()
 {
-	const LuaTable terrTypeTable =
-		parser->GetRoot().SubTable("terrainTypes");
+	const LuaTable terrTypeTable = parser->GetRoot().SubTable("terrainTypes");
 
 	for (int tt = 0; tt < NUM_TERRAIN_TYPES; tt++) {
 		TerrainType& terrType = terrainTypes[tt];
@@ -351,10 +344,10 @@ void CMapInfo::ReadTerrainTypes()
 		terrType.shipSpeed  = moveTable.GetFloat("ship",  1.0f);
 
 		// clamps
-		terrType.hardness   = max(0.0f, terrType.hardness);
-		terrType.tankSpeed  = max(0.0f, terrType.tankSpeed);
-		terrType.kbotSpeed  = max(0.0f, terrType.kbotSpeed);
-		terrType.hoverSpeed = max(0.0f, terrType.hoverSpeed);
-		terrType.shipSpeed  = max(0.0f, terrType.shipSpeed);
+		terrType.hardness   = max(0.001f, terrType.hardness);
+		terrType.tankSpeed  = max(0.000f, terrType.tankSpeed);
+		terrType.kbotSpeed  = max(0.000f, terrType.kbotSpeed);
+		terrType.hoverSpeed = max(0.000f, terrType.hoverSpeed);
+		terrType.shipSpeed  = max(0.000f, terrType.shipSpeed);
 	}
 }

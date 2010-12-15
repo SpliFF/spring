@@ -257,6 +257,9 @@ using namespace Assimp::Formatter;
 #ifndef ASSIMP_BUILD_NO_OPTIMIZEGRAPH_PROCESS
 #	include "OptimizeGraph.h"
 #endif
+#ifndef ASSIMP_BUILD_NO_SPLITBYBONECOUNT_PROCESS
+#	include "SplitByBoneCountProcess.h"
+#endif
 
 using namespace Assimp;
 using namespace Assimp::Intern;
@@ -478,6 +481,9 @@ Importer::Importer()
 #if (!defined ASSIMP_BUILD_NO_FIXINFACINGNORMALS_PROCESS)
 	pimpl->mPostProcessingSteps.push_back( new FixInfacingNormalsProcess());
 #endif
+#if (!defined ASSIMP_BUILD_NO_SPLITBYBONECOUNT_PROCESS)
+	pimpl->mPostProcessingSteps.push_back( new SplitByBoneCountProcess());
+#endif
 #if (!defined ASSIMP_BUILD_NO_SPLITLARGEMESHES_PROCESS)
 	pimpl->mPostProcessingSteps.push_back( new SplitLargeMeshesProcess_Triangle());
 #endif
@@ -545,8 +551,9 @@ Importer::~Importer()
 	for( unsigned int a = 0; a < pimpl->mPostProcessingSteps.size(); a++)
 		delete pimpl->mPostProcessingSteps[a];
 
-	// Delete the assigned IO handler
+	// Delete the assigned IO and progress handler
 	delete pimpl->mIOHandler;
+	delete pimpl->mProgressHandler;
 
 	// Kill imported scene. Destructors should do that recursivly
 	delete pimpl->mScene;
@@ -1256,18 +1263,6 @@ void Importer::SetPropertyFloat(const char* szName, float iValue,
 void Importer::SetPropertyString(const char* szName, const std::string& value, 
 	bool* bWasExisting /*= NULL*/)
 {
-	try {
-		std::cout << "";
-	}
-	catch (...) {
-		try {
-			throw;
-		}
-		catch(std::exception&) {
-			return;
-		}
-	}
-
 	ASSIMP_BEGIN_EXCEPTION_REGION();
 		SetGenericProperty<std::string>(pimpl->mStringProperties, szName,value,bWasExisting);	
 	ASSIMP_END_EXCEPTION_REGION(void);

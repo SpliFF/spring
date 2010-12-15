@@ -26,8 +26,10 @@ S3DModel::S3DModel()
 	height = 0.0f;
 	radius = 0.0f;
 	relMidPos = float3(0.0f, 0.0f, 0.0f);
-	mins = float3(0.0f, 0.0f, 0.0f);
-	maxs = float3(0.0f, 0.0f, 0.0f);
+	mins = float3(10000.0f,  10000.0f,  10000.0f);
+	maxs = float3(-10000.0f, -10000.0f, -10000.0f);
+	tex1 = "default.png";
+	tex2 = "";
 }
 S3DModel::~S3DModel()
 {
@@ -65,8 +67,8 @@ S3DModelPiece::S3DModelPiece()
     pos = float3(0.0f,0.0f,0.0f);
 	rot = float3(0.0f,0.0f,0.0f);
 	scale = float3(1.0f,1.0f,1.0f);
-	mins = float3(0.0f,0.0f,0.0f);
-	maxs = float3(0.0f,0.0f,0.0f);
+	mins = float3(10000.0f,  10000.0f,  10000.0f);
+	maxs = float3(-10000.0f, -10000.0f, -10000.0f);
 }
 
 S3DModelPiece::~S3DModelPiece()

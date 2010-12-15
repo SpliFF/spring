@@ -63,6 +63,7 @@ void CS3OTextureHandler::Update() {
 int CS3OTextureHandler::LoadS3OTextureNow(const std::string& tex1, const std::string& tex2, bool flipY, bool invertAlpha)
 {
 	GML_STDMUTEX_LOCK(model); // LoadS3OTextureNow
+
 	logOutput.Print(LOG_TEXTURE, "Load S3O texture now (Flip Y Axis: %s, Invert Team Alpha: %s)",
 		flipY ? "yes" : "no",
 		invertAlpha ? "yes" : "no"
@@ -105,7 +106,7 @@ int CS3OTextureHandler::LoadS3OTextureNow(const std::string& tex1, const std::st
 		// being generated if it couldn't be loaded.
 		// Also many map features specify a tex2 but don't ship it with the map,
 		// so throwing here would cause maps to break.
-		if (!bm.Load(std::string("unittextures/" + model->tex2))) {
+		if (!bm.Load(std::string("unittextures/" + tex2))) {
 			bm.Alloc(1, 1);
 			bm.mem[3] = 255; // file not found, set alpha to white so unit is visible
 		}

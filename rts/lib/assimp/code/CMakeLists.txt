@@ -1,7 +1,3 @@
-SET( LIBRARY_VERSION "2.0.0" )
-SET( LIBRARY_SOVERSION "2" )
-
-#
 # Listing and grouping of all the source files for use with IDE project
 # generators.
 #
@@ -112,6 +108,8 @@ SOURCE_GROUP( Common FILES
 	ScenePreprocessor.h
 	SkeletonMeshBuilder.cpp
 	SkeletonMeshBuilder.h
+	SplitByBoneCountProcess.cpp
+	SplitByBoneCountProcess.h
 	SmoothingGroups.h
 	StandardShapes.cpp
 	StandardShapes.h
@@ -615,6 +613,8 @@ ADD_LIBRARY( assimp STATIC
 	SceneCombiner.h
 	ScenePreprocessor.cpp
 	ScenePreprocessor.h
+	SplitByBoneCountProcess.cpp
+	SplitByBoneCountProcess.h
 	SkeletonMeshBuilder.cpp
 	SkeletonMeshBuilder.h
 	SmoothingGroups.h
@@ -728,20 +728,7 @@ ADD_LIBRARY( assimp STATIC
 	${COMPILER_HEADERS}
 )
 
-#Build static for Spring
-#ADD_DEFINITIONS( -DASSIMP_BUILD_DLL_EXPORT )
-
 if ( MSVC80 OR MSVC90 OR MSVC10 )
 	ADD_DEFINITIONS( -D_SCL_SECURE_NO_WARNINGS )
 	ADD_DEFINITIONS( -D_CRT_SECURE_NO_WARNINGS )
 endif ( MSVC80 OR MSVC90 OR MSVC10 )
-
-# Not needed for Spring
-#SET_TARGET_PROPERTIES( assimp PROPERTIES
-#	VERSION ${LIBRARY_VERSION}
-#	SOVERSION ${LIBRARY_SOVERSION}
-#)
-
-#INSTALL( TARGETS assimp DESTINATION ${LIB_INSTALL_DIR} )
-#INSTALL( FILES ${PUBLIC_HEADERS} DESTINATION ${INCLUDE_INSTALL_DIR}/assimp )
-#INSTALL( FILES ${COMPILER_HEADERS} DESTINATION ${INCLUDE_INSTALL_DIR}/assimp/Compiler )

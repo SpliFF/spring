@@ -26,8 +26,6 @@
 
 #define IS_QNAN(f) (f != f)
 #define DEGTORAD 0.0174532925
-//static const float3 DEF_MIN_SIZE( 10000.0f,  10000.0f,  10000.0f);
-//static const float3 DEF_MAX_SIZE(-10000.0f, -10000.0f, -10000.0f);
 
 // triangulate guarantees the most complex mesh is a triangle
 // sortbytype ensure only 1 type of primitive type per mesh is used
@@ -189,6 +187,9 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
     // Update piece hierarchy based on metadata
     BuildPieceHierarchy( model );
 
+    // Update model/piece dimensions using new hierarchy
+    UpdatePieceProperties( model->rootobject );
+
     // Simplified dimensions used for rough calculations
     model->radius = metaTable.GetFloat("radius", model->radius);
     model->height = metaTable.GetFloat("height", model->height);
@@ -215,6 +216,7 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
 	SAssPiece* piece = new SAssPiece;
 	piece->type = MODELTYPE_ASS;
 	piece->node = node;
+	piece->model = model;
 	piece->isEmpty = node->mNumMeshes == 0;
 
     if (node->mParent) {
@@ -257,11 +259,10 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
     if (pieceTable.KeyExists("rotatey")) rotate.y = pieceTable.GetFloat("rotatey", 0.0f) * DEGTORAD;
     if (pieceTable.KeyExists("rotatez")) rotate.z = pieceTable.GetFloat("rotatez", 0.0f) * DEGTORAD;
 
-    scale = float3(_scale.x, _scale.z, _scale.y);
-	if (pieceTable.KeyExists("scale")) scale = pieceTable.GetFloat3("scale", float3(1.0f,1.0f,1.0f));
-    if (pieceTable.KeyExists("scalex")) scale.x = pieceTable.GetFloat("scalex", 1.0f);
-    if (pieceTable.KeyExists("scaley")) scale.y = pieceTable.GetFloat("scaley", 1.0f);
-    if (pieceTable.KeyExists("scalez")) scale.z = pieceTable.GetFloat("scalez", 1.0f);
+	scale = pieceTable.GetFloat3("scale", float3(_scale.x, _scale.z, _scale.y));
+    scale.x = pieceTable.GetFloat("scalex", scale.x);
+    scale.y = pieceTable.GetFloat("scaley", scale.y);
+    scale.z = pieceTable.GetFloat("scalez", scale.z);
 
 	logOutput.Print(LOG_PIECE, "(%d:%s) Relative offset (%f,%f,%f), rotate (%f,%f,%f), scale (%f,%f,%f)", model->numobjects, piece->name.c_str(),
 		offset.x, offset.y, offset.z,
@@ -381,19 +382,15 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
             logOutput.Print (LOG_MODEL, "Model midpos of (%f,%f,%f) set by special node 'SpringRadius'", model->relMidPos.x, model->relMidPos.y, model->relMidPos.z);
         }
         if (!metaTable.KeyExists("radius")) {
-            model->radius = piece->maxs.x;
+            if (piece->maxs.x <= 0.00001f) {
+                model->radius = piece->scale.x; // the blender import script only sets the scale property
+            } else {
+                model->radius = piece->maxs.x; // use the transformed mesh extents
+            }
             logOutput.Print (LOG_MODEL, "Model radius of %f set by special node 'SpringRadius'", model->radius);
         }
         return NULL;
     }
-
-	// update model min/max extents
-	model->mins.x = std::min(piece->mins.x, model->mins.x);
-	model->mins.y = std::min(piece->mins.y, model->mins.y);
-	model->mins.z = std::min(piece->mins.z, model->mins.z);
-	model->maxs.x = std::max(piece->maxs.x, model->maxs.x);
-	model->maxs.y = std::max(piece->maxs.y, model->maxs.y);
-	model->maxs.z = std::max(piece->maxs.z, model->maxs.z);
 
 	// collision volume for piece (not sure about these coords)
 	const float3 cvScales = (piece->maxs) - (piece->mins);
@@ -413,9 +410,8 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
     } else {
         piece->parentName = "";
     }
-    //piece->parentName = "root"; // TODO REMOVE
 
-    logOutput.Print (LOG_PIECE, "Loaded model piece: %s with %d meshes\n", piece->name.c_str(), node->mNumMeshes );
+    logOutput.Print(LOG_PIECE, "Loaded model piece: %s with %d meshes\n", piece->name.c_str(), node->mNumMeshes );
 
     // Verbose logging of piece properties
     logOutput.Print(LOG_PIECE, "piece->name: %s", piece->name.c_str());
@@ -460,15 +456,24 @@ void CAssParser::BuildPieceHierarchy( S3DModel* model )
     }
 }
 
-/*
-    // Loop over the pieces defined in the metadata
-    const LuaTable& pieceTable = model->meta.SubTable("pieces");
-	std::vector<std::string> metaPieceNames;
-	piecesTable.GetKeys(metaPieceNames);
-	if (!metaPieceNames.empty()) {
+// Iterate over the model and calculate its overall dimensions
+void CAssParser::UpdatePieceProperties( S3DModelPiece* piece )
+{
+    piece->goffset = piece->parent ? piece->parent->goffset + piece->pos : piece->pos;
 
+	// update model min/max extents
+	piece->model->mins.x = std::min(piece->goffset.x + piece->mins.x, piece->model->mins.x);
+	piece->model->mins.y = std::min(piece->goffset.y + piece->mins.y, piece->model->mins.y);
+	piece->model->mins.z = std::min(piece->goffset.z + piece->mins.z, piece->model->mins.z);
+	piece->model->maxs.x = std::max(piece->goffset.x + piece->maxs.x, piece->model->maxs.x);
+	piece->model->maxs.y = std::max(piece->goffset.y + piece->maxs.y, piece->model->maxs.y);
+	piece->model->maxs.z = std::max(piece->goffset.z + piece->maxs.z, piece->model->maxs.z);
+
+	// Repeat with childs
+	for (unsigned int i = 0; i < piece->childs.size(); i++) {
+		UpdatePieceProperties(piece->childs[i]);
 	}
-*/
+}
 
 void DrawPiecePrimitive( const S3DModelPiece* o)
 {

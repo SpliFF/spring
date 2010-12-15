@@ -43,6 +43,7 @@ public:
 private:
 	SAssPiece* LoadPiece(S3DModel* model, aiNode* node, const LuaTable& metaTable);
 	void BuildPieceHierarchy(S3DModel* model);
+	void UpdatePieceProperties( S3DModelPiece* piece );
 };
 
 #endif /* ASSPARSER_H */

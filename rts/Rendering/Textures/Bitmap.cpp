@@ -272,9 +272,9 @@ bool CBitmap::LoadGrayscale(const std::string& filename)
 	delete[] mem;
 	mem = new unsigned char[xsize * ysize];
 	memcpy(mem, ilGetData(), xsize * ysize);
-	
+
 	ilDeleteImages(1, &ImageName);
-	
+
 	return true;
 }
 
@@ -786,6 +786,9 @@ void CBitmap::Tint(const float tint[3])
 
 void CBitmap::ReverseYAxis()
 {
+    if (type != BitmapTypeStandardRGBA) {
+		return;
+	}
 	unsigned char* tmpLine = new unsigned char[channels * xsize];
 	for (int y=0; y < (ysize / 2); ++y) {
 		const int pixelLow  = (((y            ) * xsize) + 0) * channels;

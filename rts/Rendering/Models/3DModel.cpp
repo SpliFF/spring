@@ -51,7 +51,6 @@ void S3DModelPiece::DrawStatic() const
 {
 	glPushMatrix();
 	glTranslatef(pos.x, pos.y, pos.z);
-	//glScalef(scale.x, scale.y, scale.z);
 	if (rot[1]) { glRotatef(rot[1] * RADTOANG, 0.0f, 1.0f, 0.0f); }
 	if (rot[0]) { glRotatef(rot[0] * RADTOANG, 1.0f, 0.0f, 0.0f); }
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
@@ -149,7 +148,6 @@ void LocalModelPiece::Draw() const
 	glPushMatrix();
 
 	if (pos.x || pos.y || pos.z) { glTranslatef(pos.x, pos.y, pos.z); }
-	//if (scale.x!=1.0f || scale.y!=1.0f || scale.z!=1.0f) { glScalef(scale.x, scale.y, scale.z); }
 	if (rot[1]) { glRotatef(rot[1] * RADTOANG, 0.0f, 1.0f, 0.0f); }
 	if (rot[0]) { glRotatef(rot[0] * RADTOANG, 1.0f, 0.0f, 0.0f); }
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
@@ -173,7 +171,6 @@ void LocalModelPiece::DrawLOD(unsigned int lod) const
 	glPushMatrix();
 
 	if (pos.x || pos.y || pos.z) { glTranslatef(pos.x, pos.y, pos.z); }
-	//if (scale.x!=1.0f || scale.y!=1.0f || scale.z!=1.0f) { glScalef(scale.x, scale.y, scale.z); }
 	if (rot[1]) { glRotatef(rot[1] * RADTOANG, 0.0f, 1.0f, 0.0f); }
 	if (rot[0]) { glRotatef(rot[0] * RADTOANG, 1.0f, 0.0f, 0.0f); }
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
@@ -196,7 +193,6 @@ void LocalModelPiece::ApplyTransform() const
 	}
 
 	if (pos.x || pos.y || pos.z) { glTranslatef(pos.x, pos.y, pos.z); }
-	//if (scale.x!=1.0f || scale.y!=1.0f || scale.z!=1.0f) { glScalef(scale.x, scale.y, scale.z); }
 	if (rot[1]) { glRotatef(rot[1] * RADTOANG, 0.0f, 1.0f, 0.0f); }
 	if (rot[0]) { glRotatef(rot[0] * RADTOANG, 1.0f, 0.0f, 0.0f); }
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
@@ -210,8 +206,6 @@ void LocalModelPiece::GetPiecePosIter(CMatrix44f* mat) const
 	}
 
 	if (pos.x || pos.y || pos.z) { mat->Translate(pos.x, pos.y, pos.z); }
-	// do we need scale? not sure
-	// if (scale.x!=1.0f || scale.y!=1.0f || scale.z!=1.0f) { mat->Scale(scale.x, scale.y, scale.z); }
 	if (rot[1]) { mat->RotateY(-rot[1]); }
 	if (rot[0]) { mat->RotateX(-rot[0]); }
 	if (rot[2]) { mat->RotateZ(-rot[2]); }

@@ -30,6 +30,7 @@
 // triangulate guarantees the most complex mesh is a triangle
 // sortbytype ensure only 1 type of primitive type per mesh is used
 #define ASS_POSTPROCESS_OPTIONS \
+    aiProcess_RemoveComponent               | \
 	aiProcess_FindInvalidData				| \
 	aiProcess_CalcTangentSpace				| \
 	aiProcess_GenSmoothNormals				| \
@@ -40,7 +41,6 @@
 	aiProcess_JoinIdenticalVertices
 
 //aiProcess_ImproveCacheLocality
-
 
 // Convert Assimp quaternion to radians around x, y and z
 float3 QuaternionToRadianAngles( aiQuaternion q1 )
@@ -123,13 +123,16 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
 	// Create a model importer instance
  	Assimp::Importer importer;
 
-	// Give the importer an IO class that handles Spring's VFS
-	importer.SetIOHandler( new AssVFSSystem() );
-
 	// Create a logger for debugging model loading issues
 	Assimp::DefaultLogger::create("",Assimp::Logger::VERBOSE);
 	const unsigned int severity = Assimp::Logger::DEBUGGING|Assimp::Logger::INFO|Assimp::Logger::ERR|Assimp::Logger::WARN;
 	Assimp::DefaultLogger::get()->attachStream( new AssLogStream(), severity );
+
+	// Give the importer an IO class that handles Spring's VFS
+	importer.SetIOHandler( new AssVFSSystem() );
+
+    // Speed-up processing by skipping things we don't need
+    importer.SetPropertyInteger(AI_CONFIG_PP_RVC_FLAGS, aiComponent_CAMERAS|aiComponent_LIGHTS|aiComponent_TEXTURES|aiComponent_ANIMATIONS);
 
 	// Read the model file to build a scene object
 	logOutput.Print(LOG_MODEL, "Importing model file: %s\n", modelFileName.c_str() );
@@ -242,11 +245,10 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
 		_scale.x, _scale.y, _scale.z
 	);
 
-    offset = float3(_offset.x, _offset.y, _offset.z);
-	if (pieceTable.KeyExists("offset")) offset = pieceTable.GetFloat3("offset", float3(0.0f, 0.0f, 0.0f));
-    if (pieceTable.KeyExists("offsetx")) offset.x = pieceTable.GetFloat("offsetx", 0.0f);
-    if (pieceTable.KeyExists("offsety")) offset.y = pieceTable.GetFloat("offsety", 0.0f);
-    if (pieceTable.KeyExists("offsetz")) offset.z = pieceTable.GetFloat("offsetz", 0.0f);
+	offset = pieceTable.GetFloat3("offset", float3(_offset.x, _offset.y, _offset.z));
+    offset.x = pieceTable.GetFloat("offsetx", offset.x);
+    offset.y = pieceTable.GetFloat("offsety", offset.y);
+    offset.z = pieceTable.GetFloat("offsetz", offset.z);
 
     if (pieceTable.KeyExists("rotate")) {
         rotate = pieceTable.GetFloat3("rotate", float3(0.0f, 0.0f, 0.0f));
@@ -378,7 +380,7 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
     }
     if (strcmp(node->mName.data, "SpringRadius") == 0) {
         if (!metaTable.KeyExists("midpos")) {
-            model->relMidPos = piece->pos;
+            model->relMidPos = float3(piece->pos.x, piece->pos.z, piece->pos.y); // Y and Z are swapped because this piece isn't rotated
             logOutput.Print (LOG_MODEL, "Model midpos of (%f,%f,%f) set by special node 'SpringRadius'", model->relMidPos.x, model->relMidPos.y, model->relMidPos.z);
         }
         if (!metaTable.KeyExists("radius")) {

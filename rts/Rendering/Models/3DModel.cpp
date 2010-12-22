@@ -74,6 +74,7 @@ S3DModelPiece::~S3DModelPiece()
 }
 
 
+
 /******************************************************************************/
 /******************************************************************************/
 //
@@ -129,6 +130,26 @@ float3 LocalModel::GetRawPieceDirection(int piecenum) const
 {
 	return pieces[piecenum]->GetDirection();
 }
+
+
+
+void LocalModel::CreatePieces(S3DModelPiece* mpParent, unsigned int* pieceNum) {
+	LocalModelPiece* lmpParent = pieces[*pieceNum];
+	LocalModelPiece* lmpChild = NULL;
+
+	lmpParent->Init(mpParent);
+	lmpParent->SetCollisionVolume(new CollisionVolume(mpParent->GetCollisionVolume()));
+
+	for (unsigned int i = 0; i < mpParent->GetChildCount(); i++) {
+		lmpChild = pieces[ ++(*pieceNum) ];
+
+		lmpChild->SetParent(lmpParent);
+		lmpParent->AddChild(lmpChild);
+
+		CreatePieces(mpParent->GetChild(i), pieceNum);
+	}
+}
+
 
 
 /******************************************************************************/

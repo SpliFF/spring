@@ -1320,7 +1320,7 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 					}
 					break;
 				}
-				case TEAMMSG_TEAM_DIED: { // don't send to clients, they don't need it
+				case TEAMMSG_TEAM_DIED: {
 					const unsigned team = inbuf[3];
 #ifndef DEDICATED
 					if (players[player].isLocal) { // currently only host is allowed
@@ -1337,6 +1337,7 @@ void CGameServer::ProcessPacket(const unsigned playernum, boost::shared_ptr<cons
 								players[p].spectator = true;
 								if (hostif)
 									hostif->SendPlayerDefeated(p);
+								Broadcast(CBaseNetProtocol::Get().SendTeamDied(player, team));
 							}
 						}
 						// The teams Skirmish AIs destruction process
@@ -2308,3 +2309,4 @@ void CGameServer::AddToPacketCache(boost::shared_ptr<const netcode::RawPacket> &
 	}
 	packetCache.back().push_back(pckt);
 }
+

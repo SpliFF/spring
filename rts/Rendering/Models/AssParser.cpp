@@ -103,7 +103,7 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
 	CFileHandler* metaFile = new CFileHandler(metaFileName);
 	if (!metaFile->FileExists()) {
 	    // Try again without the model file extension
-        metaFileName = modelPath + modelName + ".lua";
+        metaFileName = modelPath + '/' + modelName + ".lua";
         metaFile = new CFileHandler(metaFileName);
 	}
 	LuaParser metaFileParser(metaFileName, SPRING_VFS_MOD_BASE, SPRING_VFS_ZIP);
@@ -190,15 +190,17 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
     // Update piece hierarchy based on metadata
     BuildPieceHierarchy( model );
 
-    // Update model/piece dimensions using new hierarchy
-    UpdatePieceProperties( model->rootobject );
-
     // Simplified dimensions used for rough calculations
     model->radius = metaTable.GetFloat("radius", model->radius);
     model->height = metaTable.GetFloat("height", model->height);
     model->relMidPos = metaTable.GetFloat3("midpos", model->relMidPos);
     model->mins = metaTable.GetFloat3("mins", model->mins);
     model->maxs = metaTable.GetFloat3("maxs", model->maxs);
+
+    // Calculate model dimensions if not set
+    if (!metaTable.KeyExists("mins") || !metaTable.KeyExists("maxs")) CalculateMinMax( model->rootobject );
+    if (model->radius < 0.0001f) CalculateRadius( model );
+    if (model->height < 0.0001f) CalculateHeight( model );
 
     // Verbose logging of model properties
     logOutput.Print(LOG_MODEL_DETAIL, "model->name: %s", model->name.c_str());
@@ -459,7 +461,7 @@ void CAssParser::BuildPieceHierarchy( S3DModel* model )
 }
 
 // Iterate over the model and calculate its overall dimensions
-void CAssParser::UpdatePieceProperties( S3DModelPiece* piece )
+void CAssParser::CalculateMinMax( S3DModelPiece* piece )
 {
     piece->goffset = piece->parent ? piece->parent->goffset + piece->pos : piece->pos;
 
@@ -473,8 +475,22 @@ void CAssParser::UpdatePieceProperties( S3DModelPiece* piece )
 
 	// Repeat with childs
 	for (unsigned int i = 0; i < piece->childs.size(); i++) {
-		UpdatePieceProperties(piece->childs[i]);
+		CalculateMinMax(piece->childs[i]);
 	}
+}
+
+// Calculate model radius from the min/max extents
+void CAssParser::CalculateRadius( S3DModel* model )
+{
+    model->radius = std::max(model->radius, model->maxs.x);
+    model->radius = std::max(model->radius, model->maxs.y);
+    model->radius = std::max(model->radius, model->maxs.z);
+}
+
+// Calculate model height from the min/max extents
+void CAssParser::CalculateHeight( S3DModel* model )
+{
+    model->height = model->maxs.z;
 }
 
 void DrawPiecePrimitive( const S3DModelPiece* o)

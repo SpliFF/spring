@@ -2,11 +2,12 @@
 
 #include "StdAfx.h"
 #include "Matrix44f.h"
+#include <memory.h>
+#include "mmgr.h"
 
 CR_BIND(CMatrix44f, );
 
 CR_REG_METADATA(CMatrix44f, CR_MEMBER(m));
-<<<<<<< HEAD
 
 
 CMatrix44f::CMatrix44f()
@@ -220,6 +221,7 @@ void CMatrix44f::Translate(const float3& pos)
 	m[15] += x*m[3] + y*m[7] + z*m[11];
 }
 
+
 void CMatrix44f::Scale(float scalex, float scaley, float scalez)
 {
   /* the function should be equivalent to doing this:
@@ -245,6 +247,7 @@ void CMatrix44f::Scale(float scalex, float scaley, float scalez)
   m[10] *= scalez;
   m[11] *= scalez;
 }
+
 
 CMatrix44f CMatrix44f::Mul(const CMatrix44f& m2) const
 {
@@ -440,5 +443,3 @@ bool CMatrix44f::Invert(const double m[4][4], double mInv[4][4])
 
 	return true;
 }
-=======
->>>>>>> edf408a... inline CMatrix44f

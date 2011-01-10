@@ -9,7 +9,7 @@
 
 #include "maindefines.h"
 
-static inline void StringToLowerInPlace(std::string &s)
+static inline void StringToLowerInPlace(std::string& s)
 {
 	std::transform(s.begin(), s.end(), s.begin(), (int (*)(int))tolower);
 }
@@ -70,11 +70,31 @@ static inline std::string FloatToString(float f, const std::string& format = "%f
 }
 
 /**
+ * Returns true of the argument string matches "0|n|no|f|false".
+ * The matching is done case insensitive.
+ */
+bool StringToBool(std::string str);
+
+/// Returns true if str starts with prefix
+bool StringStartsWith(const std::string& str, const char* prefix);
+static inline bool StringStartsWith(const std::string& str, const std::string& prefix)
+{
+	return StringStartsWith(str, prefix.c_str());
+}
+
+/// Returns true if str ends with postfix
+bool StringEndsWith(const std::string& str, const char* postfix);
+static inline bool StringEndsWith(const std::string& str, const std::string& postfix)
+{
+	return StringEndsWith(str, postfix.c_str());
+}
+
+/**
  * @brief Safely delete object by first setting pointer to NULL and then deleting.
  * This way it is guaranteed other objects can not access the object through the
  * pointer while the object is running it's destructor.
  */
-template<class T> void SafeDelete(T &a)
+template<class T> void SafeDelete(T& a)
 {
 	T tmp = a;
 	a = NULL;
@@ -95,5 +115,17 @@ namespace proc {
 	unsigned int GetProcMaxExtendedLevel();
 	unsigned int GetProcSSEBits();
 }
+
+// set.erase(iterator++) is prone to crash with MSVC
+template <class S, class I>
+inline I set_erase(S &s, I i) {
+#ifdef _MSC_VER
+		return s.erase(i);
+#else
+		s.erase(i++);
+		return i;
+#endif
+}
+
 
 #endif // UTIL_H

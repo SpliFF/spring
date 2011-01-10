@@ -54,7 +54,7 @@ void S3DModelPiece::DrawStatic() const
 	if (rot[1]) { glRotatef(rot[1] * RADTOANG, 0.0f, 1.0f, 0.0f); }
 	if (rot[0]) { glRotatef(rot[0] * RADTOANG, 1.0f, 0.0f, 0.0f); }
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
-	glCallList(displist);
+	glCallList(dispListID);
 	for (std::vector<S3DModelPiece*>::const_iterator ci = childs.begin(); ci != childs.end(); ++ci) {
 		(*ci)->DrawStatic();
 	}
@@ -72,9 +72,10 @@ S3DModelPiece::S3DModelPiece()
 
 S3DModelPiece::~S3DModelPiece()
 {
-	glDeleteLists(displist, 1);
+	glDeleteLists(dispListID, 1);
 	delete colvol;
 }
+
 
 
 /******************************************************************************/
@@ -87,7 +88,7 @@ LocalModel::~LocalModel()
 {
 	// delete the local piece copies
 	for (std::vector<LocalModelPiece*>::iterator pi = pieces.begin(); pi != pieces.end(); ++pi) {
-		delete (*pi)->colvol;
+		delete (*pi)->GetCollisionVolume();
 		delete (*pi);
 	}
 	pieces.clear();
@@ -134,6 +135,26 @@ float3 LocalModel::GetRawPieceDirection(int piecenum) const
 }
 
 
+
+void LocalModel::CreatePieces(S3DModelPiece* mpParent, unsigned int* pieceNum) {
+	LocalModelPiece* lmpParent = pieces[*pieceNum];
+	LocalModelPiece* lmpChild = NULL;
+
+	lmpParent->Init(mpParent);
+	lmpParent->SetCollisionVolume(new CollisionVolume(mpParent->GetCollisionVolume()));
+
+	for (unsigned int i = 0; i < mpParent->GetChildCount(); i++) {
+		lmpChild = pieces[ ++(*pieceNum) ];
+
+		lmpChild->SetParent(lmpParent);
+		lmpParent->AddChild(lmpChild);
+
+		CreatePieces(mpParent->GetChild(i), pieceNum);
+	}
+}
+
+
+
 /******************************************************************************/
 /******************************************************************************/
 //
@@ -153,7 +174,7 @@ void LocalModelPiece::Draw() const
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
 
 	if (visible)
-		glCallList(displist);
+		glCallList(dispListID);
 
 	for (unsigned int i = 0; i < childs.size(); i++) {
 		childs[i]->Draw();
@@ -165,7 +186,7 @@ void LocalModelPiece::Draw() const
 
 void LocalModelPiece::DrawLOD(unsigned int lod) const
 {
-	if (!visible && childs.size()==0)
+	if (!visible && childs.empty())
 		return;
 
 	glPushMatrix();
@@ -237,7 +258,7 @@ float3 LocalModelPiece::GetPos() const
 	CMatrix44f mat;
 	GetPiecePosIter(&mat);
 
-	if (type == MODELTYPE_3DO) {
+	if (original->type == MODELTYPE_3DO) {
 		// fix for valkyres
 		const S3DOPiece* p3 = static_cast<S3DOPiece*>(original);
 		if (p3 && (p3->vertices.size() == 2)) {

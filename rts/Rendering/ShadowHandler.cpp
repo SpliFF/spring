@@ -2,6 +2,7 @@
 
 #include "StdAfx.h"
 #include "mmgr.h"
+#include <cfloat>
 
 #include "ShadowHandler.h"
 #include "Game/Camera.h"
@@ -25,6 +26,7 @@
 #include "Rendering/Env/BaseTreeDrawer.h"
 
 #define DEFAULT_SHADOWMAPSIZE 2048
+#define SHADOWMATRIX_NONLINEAR 0
 
 CShadowHandler* shadowHandler = 0;
 
@@ -134,6 +136,7 @@ CShadowHandler::~CShadowHandler(void)
 
 void CShadowHandler::LoadShadowGenShaderProgs()
 {
+	#define sh shaderHandler
 	shadowGenProgs.resize(SHADOWGEN_PROGRAM_LAST);
 
 	static const std::string shadowGenProgNames[SHADOWGEN_PROGRAM_LAST] = {
@@ -158,12 +161,17 @@ void CShadowHandler::LoadShadowGenShaderProgs()
 		"#define SHADOWGEN_PROGRAM_PROJECTILE\n",
 	};
 
-	CShaderHandler* sh = shaderHandler;
+	static const std::string extraDef =
+	#if (SHADOWMATRIX_NONLINEAR == 1)
+		"#define SHADOWMATRIX_NONLINEAR 0\n";
+	#else
+		"#define SHADOWMATRIX_NONLINEAR 1\n";
+	#endif
 
 	if (globalRendering->haveGLSL) {
 		for (int i = 0; i < SHADOWGEN_PROGRAM_LAST; i++) {
 			Shader::IProgramObject* po = sh->CreateProgramObject("[ShadowHandler]", shadowGenProgHandles[i] + "GLSL", false);
-			Shader::IShaderObject* so = sh->CreateShaderObject("GLSL/ShadowGenVertProg.glsl", shadowGenProgDefines[i], GL_VERTEX_SHADER);
+			Shader::IShaderObject* so = sh->CreateShaderObject("GLSL/ShadowGenVertProg.glsl", shadowGenProgDefines[i] + extraDef, GL_VERTEX_SHADER);
 
 			po->AttachShaderObject(so);
 			po->Link();
@@ -188,6 +196,7 @@ void CShadowHandler::LoadShadowGenShaderProgs()
 	}
 
 	drawShadows = true;
+	#undef sh
 }
 
 
@@ -198,7 +207,7 @@ bool CShadowHandler::InitDepthTarget()
 	// it turns the shadow render buffer in a buffer with color
 	bool useColorTexture = false;
 	if (!fb.IsValid()) {
-		logOutput.Print("framebuffer not valid!");
+		logOutput.Print("Warning: ShadowHandler: framebuffer not valid!");
 		return false;
 	}
 	glGenTextures(1,&shadowTexture);
@@ -270,13 +279,18 @@ void CShadowHandler::DrawShadowPasses(void)
 
 void CShadowHandler::SetShadowMapSizeFactors()
 {
-	if (shadowMapSize == 2048) {
+	#if (SHADOWMATRIX_NONLINEAR == 1)
+	if (shadowMapSize >= 2048) {
 		p17 =  0.01f;
 		p18 = -0.1f;
 	} else {
 		p17 =  0.0025f;
 		p18 = -0.05f;
 	}
+	#else
+	p17 =  FLT_MAX;
+	p18 =  1.0f;
+	#endif
 }
 
 void CShadowHandler::CreateShadows(void)
@@ -323,8 +337,13 @@ void CShadowHandler::CreateShadows(void)
 	const float maxLengthX = (x2 - x1) * 1.5f;
 	const float maxLengthY = (y2 - y1) * 1.5f;
 
+	#if (SHADOWMATRIX_NONLINEAR == 1)
 	xmid = 1.0f - (sqrt(fabs(x2)) / (sqrt(fabs(x2)) + sqrt(fabs(x1))));
 	ymid = 1.0f - (sqrt(fabs(y2)) / (sqrt(fabs(y2)) + sqrt(fabs(y1))));
+	#else
+	xmid = 0.5f;
+	ymid = 0.5f;
+	#endif
 
 	shadowMatrix[ 0] =   cross1.x / maxLengthX;
 	shadowMatrix[ 4] =   cross1.y / maxLengthX;

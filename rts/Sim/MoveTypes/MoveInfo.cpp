@@ -20,37 +20,35 @@
 #include "System/FileSystem/CRC.h"
 #include "System/Util.h"
 
-using std::min;
-using std::max;
-
 CR_BIND(MoveData, (0));
 CR_BIND(CMoveInfo, );
 
 CR_REG_METADATA(MoveData, (
+	CR_MEMBER(name),
+
 	CR_ENUM_MEMBER(moveType),
 	CR_ENUM_MEMBER(moveFamily),
 	CR_ENUM_MEMBER(terrainClass),
-	CR_MEMBER(followGround),
 
-	CR_MEMBER(size),
+	CR_MEMBER(xsize),
+	CR_MEMBER(zsize),
 	CR_MEMBER(depth),
 	CR_MEMBER(maxSlope),
 	CR_MEMBER(slopeMod),
 	CR_MEMBER(depthMod),
-
-	CR_MEMBER(pathType),
-	CR_MEMBER(moveMath),
 	CR_MEMBER(crushStrength),
 
-	CR_MEMBER(name),
+	CR_MEMBER(pathType),
+	CR_MEMBER(unitDefRefCount),
 
-	CR_MEMBER(maxSpeed),
-	CR_MEMBER(maxTurnRate),
-
-	CR_MEMBER(maxAcceleration),
-	CR_MEMBER(maxBreaking),
-
+	CR_MEMBER(followGround),
 	CR_MEMBER(subMarine),
+
+	CR_MEMBER(heatMapping),
+	CR_MEMBER(heatMod),
+	CR_MEMBER(heatProduced),
+
+	CR_MEMBER(moveMath),
 	CR_MEMBER(tempOwner),
 
 	CR_RESERVED(16)
@@ -87,8 +85,9 @@ CMoveInfo::CMoveInfo()
 
 	for (int tt = 0; tt < CMapInfo::NUM_TERRAIN_TYPES; ++tt) {
 		const CMapInfo::TerrainType& terrType = mapInfo->terrainTypes[tt];
-		crc << terrType.tankSpeed << terrType.kbotSpeed
-			<< terrType.hoverSpeed << terrType.shipSpeed;
+
+		crc << terrType.tankSpeed << terrType.kbotSpeed;
+		crc << terrType.hoverSpeed << terrType.shipSpeed;
 	}
 
 	for (size_t num = 1; /* no test */; num++) {
@@ -99,11 +98,8 @@ CMoveInfo::CMoveInfo()
 
 		MoveData* md = new MoveData(NULL);
 
-		md->name     = StringToLower(moveTable.GetString("name", ""));
-		md->pathType = (num - 1);
-		md->maxSlope = 1.0f;
-		md->depth    = 0.0f;
-		md->depthMod = 0.0f;
+		md->name          = StringToLower(moveTable.GetString("name", ""));
+		md->pathType      = (num - 1);
 		md->crushStrength = moveTable.GetFloat("crushStrength", 10.0f);
 
 		const float minWaterDepth = moveTable.GetFloat("minWaterDepth", 10.0f);
@@ -116,14 +112,12 @@ CMoveInfo::CMoveInfo()
 			md->moveFamily = MoveData::Ship;
 			md->moveMath   = seaMoveMath;
 			md->subMarine  = moveTable.GetBool("subMarine", 0);
-		}
-		else if (md->name.find("hover") != string::npos) {
+		} else if (md->name.find("hover") != string::npos) {
 			md->moveType   = MoveData::Hover_Move;
 			md->maxSlope   = DegreesToMaxSlope(moveTable.GetFloat("maxSlope", 15.0f));
 			md->moveFamily = MoveData::Hover;
 			md->moveMath   = hoverMoveMath;
-		}
-		else {
+		} else {
 			md->moveType = MoveData::Ground_Move;
 			md->depthMod = moveTable.GetFloat("depthMod", 0.1f);
 			md->depth    = maxWaterDepth;
@@ -171,17 +165,28 @@ CMoveInfo::CMoveInfo()
 		if (b2) { md->terrainClass = MoveData::Mixed; }
 
 
+		const int xsize = std::max(1, moveTable.GetInt("footprintX",     1));
+		const int zsize = std::max(1, moveTable.GetInt("footprintZ", xsize));
+		const int scale = 2;
+
+		// make all mobile footprints point-symmetric in heightmap space
+		// (meaning that only non-even dimensions are possible and each
+		// footprint always has a unique center square)
+		md->xsize = xsize * scale;
+		md->zsize = zsize * scale;
+		md->xsize -= ((md->xsize & 1)? 0: 1);
+		md->zsize -= ((md->zsize & 1)? 0: 1);
 		md->slopeMod = moveTable.GetFloat("slopeMod", 4.0f / (md->maxSlope + 0.001f));
-		// TA has only half our resolution, multiply size by 2
-		md->size = max(2, min(8, moveTable.GetInt("footprintX", 1) * 2));
 
 		const unsigned int checksum =
-			(md->size         << 16) +
-			(md->followGround << 4) +
-			(md->subMarine    << 3) +
-			(b2               << 2) +
-			(b1               << 1) +
-			(b0               << 0);
+			(md->xsize        << 16) +
+			(md->zsize        <<  8) +
+			(md->followGround <<  4) +
+			(md->subMarine    <<  3) +
+			(b2               <<  2) +
+			(b1               <<  1) +
+			(b0               <<  0);
+
 		crc << checksum
 			<< md->maxSlope << md->slopeMod
 			<< md->depth << md->depthMod
@@ -201,8 +206,8 @@ CMoveInfo::CMoveInfo()
 
 	CHoverMoveMath::noWaterMove = (waterDamage >= 10000.0f);
 
-	crc << CGroundMoveMath::waterCost
-		<< CHoverMoveMath::noWaterMove;
+	crc << CGroundMoveMath::waterCost;
+	crc << CHoverMoveMath::noWaterMove;
 
 	moveInfoChecksum = crc.GetDigest();
 }

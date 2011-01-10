@@ -13,7 +13,7 @@
 #include "Sim/Weapons/WeaponDef.h"
 #include "System/creg/STL_Deque.h"
 
-CR_BIND_DERIVED(CFireBallProjectile, CWeaponProjectile, (float3(0,0,0),float3(0,0,0),NULL,NULL,float3(0,0,0),NULL));
+CR_BIND_DERIVED(CFireBallProjectile, CWeaponProjectile, (ZeroVector, ZeroVector, NULL, NULL, ZeroVector, NULL));
 CR_BIND(CFireBallProjectile::Spark, );
 
 CR_REG_METADATA(CFireBallProjectile,(
@@ -35,7 +35,7 @@ CFireBallProjectile::CFireBallProjectile(
 	CUnit* owner, CUnit* target,
 	const float3& targetPos,
 	const WeaponDef* weaponDef):
-	CWeaponProjectile(pos, speed, owner, target, targetPos, weaponDef, 0, 1)
+	CWeaponProjectile(pos, speed, owner, target, targetPos, weaponDef, NULL, 1)
 {
 	projectileType = WEAPON_FIREBALL_PROJECTILE;
 
@@ -44,26 +44,24 @@ CFireBallProjectile::CFireBallProjectile(
 		drawRadius = weaponDef->size;
 	}
 
-	if (!cegTag.empty()) {
-		ceg.Load(explGenHandler, cegTag);
-	}
+	cegID = gCEG->Load(explGenHandler, cegTag);
 }
 
-CFireBallProjectile::~CFireBallProjectile(void)
+CFireBallProjectile::~CFireBallProjectile()
 {
 }
 
 void CFireBallProjectile::Draw()
 {
-	inArray=true;
-	unsigned char col[4] = {255,150, 100, 1};
+	inArray = true;
+	unsigned char col[4] = { 255, 150, 100, 1 };
 
 	float3 interPos = checkCol ? drawPos : pos;
-	float size = radius*1.3f;
+	float size = radius * 1.3f;
 
-	int numSparks=sparks.size();
-	int numFire=std::min(10,numSparks);
-	va->EnlargeArrays((numSparks+numFire)*4,0,VA_SIZE_TC);
+	int numSparks = sparks.size();
+	int numFire = std::min(10, numSparks);
+	va->EnlargeArrays((numSparks + numFire) * 4, 0, VA_SIZE_TC);
 
 	for (int i = 0; i < numSparks; i++) {
 		//! CAUTION: loop count must match EnlargeArrays above
@@ -79,9 +77,10 @@ void CFireBallProjectile::Draw()
 		#undef ept
 	}
 
-	int maxCol=numFire;
-	if (checkCol)
+	int maxCol = numFire;
+	if (checkCol) {
 		maxCol = 10;
+	}
 
 	for (int i = 0; i < numFire; i++) //! CAUTION: loop count must match EnlargeArrays above
 	{
@@ -116,8 +115,9 @@ void CFireBallProjectile::Update()
 
 		EmitSpark();
 	} else {
-		if (sparks.size() == 0)
+		if (sparks.empty()) {
 			deleteMe = true;
+		}
 	}
 
 	for (unsigned int i = 0; i < sparks.size(); i++) {
@@ -126,15 +126,13 @@ void CFireBallProjectile::Update()
 			sparks.pop_back();
 			break;
 		}
-		if (checkCol)
+		if (checkCol) {
 			sparks[i].pos += sparks[i].speed;
+		}
 		sparks[i].speed *= 0.95f;
 	}
 
-	if (!cegTag.empty()) {
-		ceg.Explosion(pos, ttl, (sparks.size() > 0)? sparks[0].size: 0.0f, 0x0, 0.0f, 0x0, speed);
-	}
-
+	gCEG->Explosion(cegID, pos, ttl, (sparks.size() > 0) ? sparks[0].size : 0.0f, NULL, 0.0f, NULL, speed);
 	UpdateGroundBounce();
 }
 
@@ -154,7 +152,7 @@ void CFireBallProjectile::EmitSpark()
 
 void CFireBallProjectile::Collision()
 {
-	if (weaponDef->waterweapon && ground->GetHeight2(pos.x, pos.z) < pos.y) {
+	if (weaponDef->waterweapon && ground->GetHeightReal(pos.x, pos.z) < pos.y) {
 		// make waterweapons not explode in water
 		return;
 	}

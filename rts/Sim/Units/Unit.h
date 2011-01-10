@@ -27,7 +27,6 @@ struct LocalModel;
 struct LocalModelPiece;
 struct UnitDef;
 struct UnitTrackStruct;
-struct CollisionVolume;
 struct DirectControlStruct;
 
 class CTransportUnit;
@@ -70,7 +69,8 @@ public:
 	CUnit();
 	virtual ~CUnit();
 
-	virtual void UnitInit(const UnitDef* def, int team, const float3& position);
+	virtual void PreInit(const UnitDef* def, int team, int facing, const float3& position, bool build);
+	virtual void PostInit(const CUnit* builder);
 
 	bool AttackGround(const float3& pos, bool dgun);
 	bool AttackUnit(CUnit* unit, bool dgun);
@@ -78,7 +78,7 @@ public:
 	virtual void DoDamage(const DamageArray& damages, CUnit* attacker,
 	                      const float3& impulse, int weaponId = -1);
 	virtual void DoWaterDamage();
-	virtual void Kill(float3& impulse);
+	virtual void Kill(const float3& impulse);
 	virtual void FinishedBuilding();
 
 	int GetBlockingMapID() const { return id; }
@@ -124,7 +124,6 @@ public:
 	virtual void DeleteDeathDependence(CObject* o, DependenceType dep);
 
 	void SetUserTarget(CUnit* target);
-	virtual void Init(const CUnit* builder);
 	bool SetGroup(CGroup* group);
 
 	bool AllowedReclaim(CUnit* builder) const;
@@ -164,7 +163,6 @@ public:
 	virtual void StopAttackingAllyTeam(int ally);
 
 	const UnitDef* unitDef;
-	CollisionVolume* collisionVolume;
 	std::string unitDefName;
 
 	/**
@@ -177,9 +175,6 @@ public:
 	 */
 	LuaRulesParams::Params  modParams;
 	LuaRulesParams::HashMap modParamsMap; ///< name map for mod parameters
-
-	/// tells the units main function to the ai, eg "builder"
-	int aihint;
 
 	/// the forward direction of the unit
 	SyncedFloat3 frontdir;
@@ -212,7 +207,8 @@ public:
 
 	/**
 	 * neutral allegiance, will not be automatically
-	 * fired upon unless the fireState is set to >= 3
+	 * fired upon unless the fireState is set to >
+	 * FIRESTATE_FIREATWILL
 	 */
 	bool neutral;
 
@@ -372,12 +368,10 @@ public:
 	/// number of shots due to the latest command
 	int commandShotCount;
 
-	/// 0=hold fire,1=return,2=fire at will
 	int fireState;
+	int moveState;
 	/// temp variable that can be set when building etc to stop units to turn away to fire
 	bool dontFire;
-	/// 0=hold pos,1=maneuvre,2=roam
-	int moveState;
 
 	/// if the unit is in it's 'on'-state
 	bool activated;

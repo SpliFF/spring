@@ -116,6 +116,8 @@ C3DOParser::C3DOParser()
 	while (!file.Eof()) {
 		teamtex.insert(StringToLower(parser.GetLine()));
 	}
+
+	fileBuf = NULL;
 }
 
 
@@ -127,11 +129,14 @@ S3DModel* C3DOParser::Load(const string& name)
 	}
 
 	fileBuf = new unsigned char[file.FileSize()];
-	file.Read(fileBuf, file.FileSize());
+	assert(fileBuf);
 
-	if (fileBuf == NULL) {
+	const int readn = file.Read(fileBuf, file.FileSize());
+
+	if (readn == 0) {
 		delete[] fileBuf;
-		throw content_error("Failed to read file " + name);
+		fileBuf = NULL;
+		throw content_error("[3DOParser] Failed to read file " + name);
 	}
 
 	S3DModel* model = new S3DModel;
@@ -140,15 +145,15 @@ S3DModel* C3DOParser::Load(const string& name)
 		model->textureType = 0;
 		model->flipTexY = false; // unused by 3DO
 		model->invertAlpha = false; // unused by 3DO
-		model->numobjects  = 0;
+		model->numPieces  = 0;
 		model->mins = DEF_MIN_SIZE;
 		model->maxs = DEF_MAX_SIZE;
 		model->radius = 0.0f;
 		model->height = 0.0f;
 
-	S3DOPiece* rootobj = LoadPiece(model, 0, NULL, &model->numobjects);
+	S3DOPiece* rootPiece = LoadPiece(model, 0, NULL, &model->numPieces);
 
-	model->rootobject = rootobj;
+	model->SetRootPiece(rootPiece);
 	model->radius =
 		(((model->maxs.x - model->mins.x) * 0.5f) * ((model->maxs.x - model->mins.x) * 0.5f)) +
 		(((model->maxs.y - model->mins.y) * 0.5f) * ((model->maxs.y - model->mins.y) * 0.5f)) +
@@ -161,6 +166,7 @@ S3DModel* C3DOParser::Load(const string& name)
 	model->relMidPos.z = 0.0f; // ?
 
 	delete[] fileBuf;
+	fileBuf = NULL;
 	return model;
 }
 
@@ -220,24 +226,27 @@ void C3DOParser::GetPrimitives(S3DOPiece* obj, int pos, int num, int excludePrim
 		for(list<int>::iterator vi=orderVert.begin();vi!=orderVert.end();++vi)
 			vertHash=(vertHash+(*vi))*(*vi);
 
-		sp.texture=0;
-		if(p.OffsetToTextureName!=0)
-		{
-			string texture = GetText(p.OffsetToTextureName);
-			StringToLowerInPlace(texture);
 
-			if(teamtex.find(texture) != teamtex.end())
-				sp.texture=texturehandler3DO->Get3DOTexture(texture);
-			else
-				sp.texture=texturehandler3DO->Get3DOTexture(texture + "00");
+		std::string texName;
 
-			if(sp.texture==0)
-				LogObject() << "Parser couldnt get texture " << GetText(p.OffsetToTextureName).c_str() << "\n";
+		if (p.OffsetToTextureName != 0) {
+			texName = StringToLower(GetText(p.OffsetToTextureName));
+
+			if (teamtex.find(texName) == teamtex.end()) {
+				texName += "00";
+			}
 		} else {
-			char t[50];
-			sprintf(t,"ta_color%i",p.PaletteEntry);
-			sp.texture=texturehandler3DO->Get3DOTexture(t);
+			texName = "ta_color" + IntToString(p.PaletteEntry, "%i");
 		}
+
+		if ((sp.texture = texturehandler3DO->Get3DOTexture(texName)) == NULL) {
+			LogObject() << "[" << __FUNCTION__ << "] ";
+			LogObject() << "unknown 3DO texture \"" << texName << "\" for piece \"" << obj->name << "\"\n";
+
+			// assign a dummy texture (the entire atlas)
+			sp.texture = texturehandler3DO->Get3DOTexture("___dummy___");
+		}
+
 
 		float3 n = -(obj->vertices[sp.vertices[1]].pos - obj->vertices[sp.vertices[0]].pos).cross(obj->vertices[sp.vertices[2]].pos - obj->vertices[sp.vertices[0]].pos);
 		n.SafeNormalize();
@@ -343,7 +352,7 @@ S3DOPiece* C3DOParser::LoadPiece(S3DModel* model, int pos, S3DOPiece* parent, in
 	S3DOPiece* piece = new S3DOPiece();
 		piece->name = s;
 		piece->parent = parent;
-		piece->displist = 0;
+		piece->dispListID = 0;
 		piece->type = MODELTYPE_3DO;
 
 		piece->mins = DEF_MIN_SIZE;
@@ -378,7 +387,7 @@ S3DOPiece* C3DOParser::LoadPiece(S3DModel* model, int pos, S3DOPiece* parent, in
 
 	piece->radius = math::sqrt(radiusSq);
 	piece->relMidPos = cvOffset * 0.5f;
-	piece->colvol = new CollisionVolume("box", cvScales, cvOffset * 0.5f, CollisionVolume::COLVOL_HITTEST_CONT);
+	piece->SetCollisionVolume(new CollisionVolume("box", cvScales, cvOffset * 0.5f, CollisionVolume::COLVOL_HITTEST_CONT));
 
 
 	if (me.OffsetToChildObject > 0) {

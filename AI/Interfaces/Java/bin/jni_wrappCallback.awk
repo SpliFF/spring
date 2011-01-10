@@ -1,4 +1,4 @@
-#!/bin/awk
+#!/usr/bin/awk -f
 #
 # This awk script creates a Java class with native/JNI functions,
 # plus their respective native counterparts,
@@ -225,7 +225,7 @@ function printNativeJNI() {
 				if (!isVoidRet) {
 					if (retTypeConv) {
 						condRet = "_retNative = ";
-					} else {retTypeConv
+					} else {
 						condRet = "_ret = (" jni_retType ") ";
 					}
 				}

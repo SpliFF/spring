@@ -12,7 +12,7 @@
 #include "Sim/Weapons/WeaponDef.h"
 #include "System/Sync/SyncTracer.h"
 
-CR_BIND_DERIVED(CEmgProjectile, CWeaponProjectile, (float3(0,0,0),float3(0,0,0),NULL,float3(0,0,0),0,0,NULL));
+CR_BIND_DERIVED(CEmgProjectile, CWeaponProjectile, (ZeroVector, ZeroVector, NULL, ZeroVector, 0, 0, NULL));
 
 CR_REG_METADATA(CEmgProjectile,(
 	CR_SETFLAG(CF_Synced),
@@ -27,7 +27,7 @@ CEmgProjectile::CEmgProjectile(
 	const float3& color, float intensity,
 	int ttl, const WeaponDef* weaponDef):
 
-	CWeaponProjectile(pos, speed, owner, 0, ZeroVector, weaponDef, 0, ttl),
+	CWeaponProjectile(pos, speed, owner, NULL, ZeroVector, weaponDef, NULL, ttl),
 	intensity(intensity),
 	color(color)
 {
@@ -35,24 +35,21 @@ CEmgProjectile::CEmgProjectile(
 
 	if (weaponDef) {
 		SetRadius(weaponDef->collisionSize);
-		drawRadius=weaponDef->size;
+		drawRadius = weaponDef->size;
 	}
 #ifdef TRACE_SYNC
 	tracefile << "New emg: ";
 	tracefile << pos.x << " " << pos.y << " " << pos.z << " " << speed.x << " " << speed.y << " " << speed.z << "\n";
 #endif
 
-
-	if (!cegTag.empty()) {
-		ceg.Load(explGenHandler, cegTag);
-	}
+	cegID = gCEG->Load(explGenHandler, cegTag);
 }
 
-CEmgProjectile::~CEmgProjectile(void)
+CEmgProjectile::~CEmgProjectile()
 {
 }
 
-void CEmgProjectile::Update(void)
+void CEmgProjectile::Update()
 {
 	if (!luaMoveCtrl) {
 		pos += speed;
@@ -65,9 +62,7 @@ void CEmgProjectile::Update(void)
 			intensity = 0;
 		}
 	} else {
-		if (!cegTag.empty()) {
-			ceg.Explosion(pos, ttl, intensity, 0x0, 0.0f, 0x0, speed);
-		}
+		gCEG->Explosion(cegID, pos, ttl, intensity, NULL, 0.0f, NULL, speed);
 	}
 	UpdateGroundBounce();
 }
@@ -78,22 +73,22 @@ void CEmgProjectile::Collision(CUnit* unit)
 }
 
 void CEmgProjectile::Collision() {
-	if (!(weaponDef->waterweapon && ground->GetHeight2(pos.x, pos.z) < pos.y))
+	if (!(weaponDef->waterweapon && ground->GetHeightReal(pos.x, pos.z) < pos.y))
 		CWeaponProjectile::Collision();
 }
 
-void CEmgProjectile::Draw(void)
+void CEmgProjectile::Draw()
 {
-	inArray=true;
+	inArray = true;
 	unsigned char col[4];
-	col[0]=(unsigned char) (color.x*intensity*255);
-	col[1]=(unsigned char) (color.y*intensity*255);
-	col[2]=(unsigned char) (color.z*intensity*255);
-	col[3]=5;//intensity*255;
-	va->AddVertexTC(drawPos-camera->right*drawRadius-camera->up*drawRadius,weaponDef->visuals.texture1->xstart,weaponDef->visuals.texture1->ystart,col);
-	va->AddVertexTC(drawPos+camera->right*drawRadius-camera->up*drawRadius,weaponDef->visuals.texture1->xend,weaponDef->visuals.texture1->ystart,col);
-	va->AddVertexTC(drawPos+camera->right*drawRadius+camera->up*drawRadius,weaponDef->visuals.texture1->xend,weaponDef->visuals.texture1->yend,col);
-	va->AddVertexTC(drawPos-camera->right*drawRadius+camera->up*drawRadius,weaponDef->visuals.texture1->xstart,weaponDef->visuals.texture1->yend,col);
+	col[0] = (unsigned char) (color.x * intensity * 255);
+	col[1] = (unsigned char) (color.y * intensity * 255);
+	col[2] = (unsigned char) (color.z * intensity * 255);
+	col[3] = 5; //intensity*255;
+	va->AddVertexTC(drawPos - camera->right * drawRadius-camera->up * drawRadius, weaponDef->visuals.texture1->xstart, weaponDef->visuals.texture1->ystart, col);
+	va->AddVertexTC(drawPos + camera->right * drawRadius-camera->up * drawRadius, weaponDef->visuals.texture1->xend,   weaponDef->visuals.texture1->ystart, col);
+	va->AddVertexTC(drawPos + camera->right * drawRadius+camera->up * drawRadius, weaponDef->visuals.texture1->xend,   weaponDef->visuals.texture1->yend,   col);
+	va->AddVertexTC(drawPos - camera->right * drawRadius+camera->up * drawRadius, weaponDef->visuals.texture1->xstart, weaponDef->visuals.texture1->yend,   col);
 }
 
 int CEmgProjectile::ShieldRepulse(CPlasmaRepulser* shield, float3 shieldPos, float shieldForce, float shieldMaxSpeed)

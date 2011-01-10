@@ -78,7 +78,7 @@ bool CTorpedoLauncher::TryTarget(const float3& pos, bool userTarget, CUnit* unit
 		if (!(weaponDef->submissile) && unit->unitDef->canfly && unit->pos.y > 0)
 			return false;
 	}
-	if (!(weaponDef->submissile) && ground->GetHeight2(pos.x, pos.z) > 0)
+	if (!(weaponDef->submissile) && ground->GetHeightReal(pos.x, pos.z) > 0)
 		return 0;
 
 	float3 dir = pos-weaponMuzzlePos;
@@ -90,10 +90,10 @@ bool CTorpedoLauncher::TryTarget(const float3& pos, bool userTarget, CUnit* unit
 	// +0.05f since torpedoes have an unfortunate tendency to hit own ships due to movement
 	float spread = (accuracy + sprayAngle) + 0.05f;
 
-	if (avoidFriendly && helper->TestAllyCone(weaponMuzzlePos, dir, length, spread, owner->allyteam, owner)) {
+	if (avoidFriendly && helper->TestCone(weaponMuzzlePos, dir, length, spread, owner, CGameHelper::TEST_ALLIED)) {
 		return false;
 	}
-	if (avoidNeutral && helper->TestNeutralCone(weaponMuzzlePos, dir, length, spread, owner)) {
+	if (avoidNeutral && helper->TestCone(weaponMuzzlePos, dir, length, spread, owner, CGameHelper::TEST_NEUTRAL)) {
 		return false;
 	}
 

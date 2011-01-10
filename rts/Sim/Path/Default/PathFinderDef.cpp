@@ -38,7 +38,7 @@ float CPathFinderDef::Heuristic(int xSquare, int zSquare) const
 // true if the goal area is "small" and blocked
 bool CPathFinderDef::GoalIsBlocked(const MoveData& moveData, unsigned int moveMathOptions) const {
 	const float r0 = SQUARE_SIZE * SQUARE_SIZE * 4;
-	const float r1 = (moveData.size / 2) * (moveData.size / 2) * 1.5f * SQUARE_SIZE * SQUARE_SIZE;
+	const float r1 = ((moveData.xsize * SQUARE_SIZE) >> 1) * ((moveData.zsize * SQUARE_SIZE) >> 1) * 1.5f;
 
 	return
 		((sqGoalRadius < r0 || sqGoalRadius <= r1) &&
@@ -61,7 +61,9 @@ int2 CPathFinderDef::GoalSquareOffset(int blockSize) const {
 CRangedGoalWithCircularConstraint::CRangedGoalWithCircularConstraint(const float3& start, const float3& goal, float goalRadius, float searchSize, int extraSize):
 CPathFinderDef(goal, goalRadius)
 {
-	// calculate the center and radius of the constrainted area
+	disabled = false;
+
+	// calculate the center and radius of the constrained area
 	const int startX = int(start.x / SQUARE_SIZE);
 	const int startZ = int(start.z / SQUARE_SIZE);
 
@@ -80,11 +82,11 @@ CPathFinderDef(goal, goalRadius)
 
 // tests if a square is inside is the circular constrained area
 // defined by the start and goal positions (disabled: this only
-// saves CPU under certain conditions and destroys admissability)
+// saves CPU under certain conditions and destroys admissibility)
 bool CRangedGoalWithCircularConstraint::WithinConstraints(int xSquare, int zSquare) const
 {
 	const int dx = halfWayX - xSquare;
 	const int dz = halfWayZ - zSquare;
 
-	return ((gs->frameNum > 0) || ((dx * dx + dz * dz) <= searchRadiusSq));
+	return (disabled || ((dx * dx + dz * dz) <= searchRadiusSq));
 }

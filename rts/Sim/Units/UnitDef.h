@@ -18,7 +18,7 @@ struct WeaponDef;
 struct S3DModel;
 struct UnitDefImage;
 struct CollisionVolume;
-class CExplosionGenerator;
+class IExplosionGenerator;
 class LuaTable;
 
 
@@ -58,26 +58,40 @@ public:
 	~UnitDef();
 
 	S3DModel* LoadModel() const;
+
 	bool DontLand() const { return dlHoverFactor >= 0.0f; }
 	void SetNoCost(bool noCost);
-	bool IsTerrainHeightOK(const float height) const;
-	float GetAllowedTerrainHeight(float height) const;
+	bool IsAllowedTerrainHeight(float rawHeight, float* clampedHeight = NULL) const;
+
+	bool IsExtractorUnit()      const { return (extractsMetal > 0.0f); }
+	bool IsTransportUnit()      const { return (transportCapacity > 0 && transportMass > 0.0f); }
+	bool IsImmobileUnit()       const { return (movedata == NULL && !canfly && speed <= 0.0f); }
+	bool IsMobileBuilderUnit()  const { return (builder && !IsImmobileUnit()); }
+	bool IsStaticBuilderUnit()  const { return (builder &&  IsImmobileUnit()); }
+	bool IsFactoryUnit()        const { return (IsStaticBuilderUnit() && canmove); }
+	bool IsGroundUnit()         const { return (movedata != NULL && !canfly); }
+	bool IsAirUnit()            const { return (movedata == NULL &&  canfly); }
+	bool IsFighterUnit()        const { return (IsAirUnit() && !hoverAttack && !HasBomberWeapon()); }
+	bool IsBomberUnit()         const { return (IsAirUnit() && !hoverAttack &&  HasBomberWeapon()); }
+
+	bool WantsMoveType() const { return (canmove && speed > 0.0f); }
+	bool HasBomberWeapon() const;
+	const std::vector<unsigned char>& GetYardMap(unsigned int facing) const { return (yardmaps[facing % /*NUM_FACINGS*/ 4]); }
 
 	std::string name;
 	std::string humanName;
 	std::string filename;
-	int id;					///< unique id for this type of unit
+
+	///< unique id for this type of unit
+	int id;
+	int cobID;				///< associated with the COB <GET COB_ID unitID> call
 
 	CollisionVolume* collisionVolume;
 
 	std::string decoyName;
 	const UnitDef* decoyDef;
 
-	int aihint;
-	int cobID;				///< associated with the COB <GET COB_ID unitID> call
-
 	int techLevel;
-	std::string gaia;
 
 	float metalUpkeep;
 	float energyUpkeep;
@@ -181,7 +195,7 @@ public:
 
 	float3 modelCenterOffset;	///< offset from the unit model's default center point
 
-	bool usePieceCollisionVolumes;		///< if true, collisions are checked per-piece
+	bool usePieceCollisionVolumes;		///< if true, projectile collisions are checked per-piece
 
 	std::vector<UnitDefWeapon> weapons;
 	const WeaponDef* shieldWeaponDef;
@@ -191,7 +205,6 @@ public:
 
 	std::map<int, std::string> buildOptions;
 
-	std::string type;
 	std::string tooltip;
 	std::string wreckName;
 
@@ -267,12 +280,15 @@ public:
 	float crashDrag;
 
 	MoveData* movedata;
-	std::vector<unsigned char> yardmaps[4];         ///< Iterations of the Ymap for building rotation
 
-	int xsize;										///< each size is 8 units
-	int zsize;										///< each size is 8 units
+	///< Iterations of the yardmap for building rotation
+	///< (only non-mobile ground units can have these)
+	std::vector<unsigned char> yardmaps[/*NUM_FACINGS*/ 4];
 
-	int buildangle;
+	///< both sizes expressed in heightmap coordinates; M x N
+	///< footprint covers M*SQUARE_SIZE x N*SQUARE_SIZE elmos
+	int xsize;
+	int zsize;
 
 	float loadingRadius;							///< for transports
 	float unloadSpread;
@@ -285,7 +301,7 @@ public:
 	float minTransportMass;
 	bool holdSteady;
 	bool releaseHeld;
-	bool cantBeTransported;
+	bool cantBeTransported;                         /// defaults to true for buildings, false for all other unit-types
 	bool transportByEnemy;
 	int transportUnloadMethod;						///< 0 - land unload, 1 - flyover drop, 2 - land flood
 	float fallSpeed;								///< dictates fall speed of all transported units
@@ -369,19 +385,18 @@ public:
 	float minAirBasePower;							///< min build power for airbases that this aircraft can land on
 
 	std::vector<std::string> sfxExplGenNames;
-	std::vector<CExplosionGenerator*> sfxExplGens;	//< list of explosion generators for use in scripts
+	std::vector<IExplosionGenerator*> sfxExplGens;	//< list of explosion generators for use in scripts
 
 	std::string pieceTrailCEGTag;					//< base tag (eg. "flame") of CEG attached to pieces of exploding units
 	int pieceTrailCEGRange;							//< range of piece CEGs (0-based, range 8 ==> tags "flame0", ..., "flame7")
 
 	int maxThisUnit;								///< number of units of this type allowed simultaneously in the game
-	bool transportableBuilding;						///< Can this building be transported?
 
 	std::map<std::string, std::string> customParams;
 
 private:
 	void ParseWeaponsTable(const LuaTable& weaponsTable);
-	void CreateYardMap(std::string yardmapStr);
+	void CreateYardMap(std::string yardMapStr);
 
 	float realMetalCost;
 	float realEnergyCost;

@@ -10,6 +10,7 @@
 #endif
 #include <sstream>
 #include <boost/system/system_error.hpp>
+#include <boost/bind.hpp>
 
 #include "System/Platform/errorhandler.h"
 #include "System/Platform/Threading.h"
@@ -62,7 +63,9 @@ int Run(int argc, char* argv[])
 
 	boost::thread* mainThread = new boost::thread(boost::bind(&MainFunc, argc, argv, &ret));
 	Threading::SetMainThread(mainThread);
-	mainThread->join();
+	while(mainThread->joinable())
+		if(mainThread->timed_join(boost::posix_time::seconds(1)))
+			break;
 	delete mainThread;
 
 	//! check if Spring crashed, if so display an error message

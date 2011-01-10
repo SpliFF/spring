@@ -11,7 +11,6 @@
 #include "S3OTextureHandler.h"
 #include "FileSystem/FileHandler.h"
 #include "FileSystem/SimpleParser.h"
-#include "LogOutput.h"
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/UnitDrawer.h"
 #include "Rendering/Models/3DModel.h"
@@ -19,16 +18,13 @@
 #include "TAPalette.h"
 #include "System/Util.h"
 #include "System/Exceptions.h"
+#include "System/LogOutput.h"
 
 static CLogSubsystem LOG_TEXTURE("Texture");
 
 // The S3O texture handler uses two textures.
 // The first contains diffuse color (RGB) and teamcolor (A)
 // The second contains glow (R), reflectivity (G) and 1-bit Alpha (A).
-
-//////////////////////////////////////////////////////////////////////
-// Construction/Destruction
-//////////////////////////////////////////////////////////////////////
 
 CS3OTextureHandler* texturehandlerS3O = NULL;
 
@@ -60,65 +56,68 @@ void CS3OTextureHandler::LoadS3OTexture(S3DModel* model) {
 void CS3OTextureHandler::Update() {
 }
 
-int CS3OTextureHandler::LoadS3OTextureNow(const std::string& tex1, const std::string& tex2, bool flipY, bool invertAlpha)
+int CS3OTextureHandler::LoadS3OTextureNow(const S3DModel* model)
 {
 	GML_STDMUTEX_LOCK(model); // LoadS3OTextureNow
 
 	logOutput.Print(LOG_TEXTURE, "Load S3O texture now (Flip Y Axis: %s, Invert Team Alpha: %s)",
-		flipY ? "yes" : "no",
-		invertAlpha ? "yes" : "no"
+		model->flipY ? "yes" : "no",
+		model->invertAlpha ? "yes" : "no"
 	);
 
-	string totalName=tex1+tex2;
-	logOutput.Print(LOG_TEXTURE, "Loading texture 1: %s", tex1.c_str());
+	const string totalName = model->tex1 + model->tex2;
 
-	if (s3oTextureNames.find(totalName) != s3oTextureNames.end()){
+	if (s3oTextureNames.find(totalName) != s3oTextureNames.end()) {
 		return s3oTextureNames[totalName];
 	}
-	const int newNum = s3oTextures.size();
+
+	logOutput.Print(LOG_TEXTURE, "Loading texture 1: %s", model->tex1.c_str());
+
+	CBitmap tex1bm;
+	CBitmap tex2bm;
 	S3oTex tex;
-	tex.num = newNum;
 
-	CBitmap bm;
-	if (!bm.Load(string("unittextures/"+tex1))) {
-		logOutput.Print("Error: Could not load S3O texture from file unittextures/%s. Using default.", tex1.c_str());
-		if (!bm.Load(string("unittextures/"+tex1))) {
-			logOutput.Print("Error: Could not load S3O texture from file unittextures/%s.", tex1.c_str());
-			bm.Alloc(1,1);
-			bm.mem[0] = 255; // file not found, make unit red
-		}
+	if (!tex1bm.Load(std::string("unittextures/" + model->tex1))) {
+		logOutput.Print("[%s] could not load texture \"%s\" from model \"%s\"", __FUNCTION__, model->tex1.c_str(), model->name.c_str());
+
+		// file not found (or headless build), set single pixel to red so unit is visible
+		tex1bm.Alloc(1, 1);
+		tex1bm.mem[0] = 255;
+		tex1bm.mem[1] =   0;
+		tex1bm.mem[2] =   0;
+		tex1bm.mem[3] = 255;
 	}
 
-	if (flipY) bm.ReverseYAxis();
-	if (invertAlpha) bm.InvertAlpha();
-	tex.tex1 = bm.CreateTexture(true);
-	tex.tex1SizeX = bm.xsize;
-	tex.tex1SizeY = bm.ysize;
+	tex.num       = s3oTextures.size();
+	tex.tex1      = tex1bm.CreateTexture(true);
+	tex.tex1SizeX = tex1bm.xsize;
+	tex.tex1SizeY = tex1bm.ysize;
+	if (model->flipY) tex1bm.ReverseYAxis();
+	if (model->invertAlpha) tex1bm.InvertAlpha();
 
-	logOutput.Print(LOG_TEXTURE, "Loading texture 2: %s", tex2.c_str());
-	tex.tex2=0;
-	tex.tex2SizeX = 0;
-	tex.tex2SizeY = 0;
-	//if (unitDrawer->advShading)
-	{
-		CBitmap bm;
-		// No error checking here... other code relies on an empty texture
-		// being generated if it couldn't be loaded.
-		// Also many map features specify a tex2 but don't ship it with the map,
-		// so throwing here would cause maps to break.
-		if (!bm.Load(std::string("unittextures/" + tex2))) {
-			bm.Alloc(1, 1);
-			bm.mem[3] = 255; // file not found, set alpha to white so unit is visible
-		}
-		if (flipY) bm.ReverseYAxis();
-		tex.tex2 = bm.CreateTexture(true);
-		tex.tex2SizeX = bm.xsize;
-		tex.tex2SizeY = bm.ysize;
+	logOutput.Print(LOG_TEXTURE, "Loading texture 2: %s", model->tex2.c_str());
+
+	// No error checking here... other code relies on an empty texture
+	// being generated if it couldn't be loaded.
+	// Also many map features specify a tex2 but don't ship it with the map,
+	// so throwing here would cause maps to break.
+	if (!tex2bm.Load(std::string("unittextures/" + model->tex2))) {
+		tex2bm.Alloc(1, 1);
+		tex2bm.mem[0] =   0; // self-illum
+		tex2bm.mem[1] =   0; // spec+refl
+		tex2bm.mem[2] =   0; // unused
+		tex2bm.mem[3] = 255; // team-color
 	}
+
+	tex.tex2      = tex2bm.CreateTexture(true);
+	tex.tex2SizeX = tex2bm.xsize;
+	tex.tex2SizeY = tex2bm.ysize;
+	if (model->flipY) tex2bm.ReverseYAxis();
+
 	s3oTextures.push_back(tex);
-	s3oTextureNames[totalName] = newNum;
+	s3oTextureNames[totalName] = tex.num;
 
-	return newNum;
+	return tex.num;
 }
 
 void CS3OTextureHandler::SetS3oTexture(int num)

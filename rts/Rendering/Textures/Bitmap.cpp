@@ -13,15 +13,17 @@
 #include "mmgr.h"
 
 #include "Rendering/GlobalRendering.h"
-#ifndef BITMAP_NO_OPENGL
-#include "Rendering/GL/myGL.h"
-#endif // !BITMAP_NO_OPENGL
 #include "FileSystem/FileHandler.h"
 #include "FileSystem/FileSystem.h"
 #include "GlobalUnsynced.h"
 #include "Bitmap.h"
 #include "bitops.h"
 #include "LogOutput.h"
+
+#ifndef BITMAP_NO_OPENGL
+	#include "Rendering/GL/myGL.h"
+	#include "System/TimeProfiler.h"
+#endif // !BITMAP_NO_OPENGL
 
 boost::mutex devilMutex; // devil functions, whilst expensive, aren't thread-save
 
@@ -137,6 +139,10 @@ void CBitmap::Alloc(int w, int h)
 
 bool CBitmap::Load(std::string const& filename, unsigned char defaultAlpha)
 {
+#ifndef BITMAP_NO_OPENGL
+	ScopedTimer timer("Textures::CBitmap::Load");
+#endif
+
 	bool noAlpha = true;
 
 	delete[] mem;
@@ -147,13 +153,17 @@ bool CBitmap::Load(std::string const& filename, unsigned char defaultAlpha)
 #endif // !BITMAP_NO_OPENGL
 
 	if (filename.find(".dds") != std::string::npos) {
+		bool status = false;
+
+#ifndef BITMAP_NO_OPENGL
 		type = BitmapTypeDDS;
 		xsize = 0;
 		ysize = 0;
 		channels = 0;
-#ifndef BITMAP_NO_OPENGL
+
 		ddsimage = new nv_dds::CDDSImage();
-		bool status = ddsimage->load(filename);
+		status = ddsimage->load(filename);
+
 		if (status) {
 			xsize = ddsimage->get_width();
 			ysize = ddsimage->get_height();
@@ -173,11 +183,10 @@ bool CBitmap::Load(std::string const& filename, unsigned char defaultAlpha)
 					break;
 			}
 		}
-		return status;
-#else
-		return false;
 #endif // !BITMAP_NO_OPENGL
+		return status;
 	}
+
 	type = BitmapTypeStandardRGBA;
 	channels = 4;
 
@@ -330,8 +339,12 @@ bool CBitmap::Save(std::string const& filename, bool opaque) const
 
 
 #ifndef BITMAP_NO_OPENGL
-const GLuint CBitmap::CreateTexture(bool mipmaps) const
+const unsigned int CBitmap::CreateTexture(bool mipmaps) const
 {
+#ifndef BITMAP_NO_OPENGL
+	ScopedTimer timer("Textures::CBitmap::CreateTexture");
+#endif
+
 	if (type == BitmapTypeDDS) {
 		return CreateDDSTexture();
 	}
@@ -349,7 +362,7 @@ const GLuint CBitmap::CreateTexture(bool mipmaps) const
 		return bm.CreateTexture(mipmaps);
 	}
 
-	GLuint texture;
+	unsigned int texture;
 
 	glGenTextures(1, &texture);
 	glBindTexture(GL_TEXTURE_2D, texture);
@@ -376,7 +389,7 @@ const GLuint CBitmap::CreateTexture(bool mipmaps) const
 }
 
 
-const GLuint CBitmap::CreateDDSTexture(GLuint texID) const
+const unsigned int CBitmap::CreateDDSTexture(unsigned int texID) const
 {
 	glPushAttrib(GL_TEXTURE_BIT);
 
@@ -394,7 +407,7 @@ const GLuint CBitmap::CreateDDSTexture(GLuint texID) const
 		glEnable(GL_TEXTURE_2D);
 		glBindTexture(GL_TEXTURE_2D, texID);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-		if (!ddsimage->upload_texture2D()) {
+		if (!ddsimage->upload_texture2D(0, GL_TEXTURE_2D)) {
 			glDeleteTextures(1, &texID);
 			texID = 0;
 		}

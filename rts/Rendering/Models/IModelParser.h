@@ -35,8 +35,6 @@ public:
 	void Update();
 	S3DModel* Load3DModel(std::string name, const float3& centerOffset = ZeroVector);
 
-	void AddParser(const std::string& ext, IModelParser* parser);
-
 	void DeleteLocalModel(CUnit* unit);
 	void CreateLocalModel(CUnit* unit);
 	void FixLocalModel(CUnit* unit);
@@ -59,8 +57,6 @@ private:
 	void DeleteChilds(S3DModelPiece* o);
 
 	LocalModel* CreateLocalModel(S3DModel* model);
-	void CreateLocalModelPieces(S3DModelPiece* model, LocalModel* lmodel, int* piecenum);
-
 	void FixLocalModel(S3DModelPiece* model, LocalModel* lmodel, int* piecenum);
 };
 

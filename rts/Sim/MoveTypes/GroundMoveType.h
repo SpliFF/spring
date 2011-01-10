@@ -14,7 +14,7 @@ class CGroundMoveType : public AMoveType
 
 public:
 	CGroundMoveType(CUnit* owner);
-	~CGroundMoveType(void);
+	~CGroundMoveType();
 
 	void PostLoad();
 
@@ -27,14 +27,14 @@ public:
 	void StartMoving(float3 pos, float goalRadius, float speed);
 	void StopMoving();
 
-	virtual void SetMaxSpeed(float speed);
+	void SetMaxSpeed(float speed);
 
-	void ImpulseAdded(void);
+	void ImpulseAdded();
 
 	void KeepPointingTo(float3 pos, float distance, bool aggressive);
 	void KeepPointingTo(CUnit* unit, float distance, bool aggressive);
 
-	bool OnSlope(void);
+	bool OnSlope();
 
 	float turnRate;
 	float accRate;
@@ -58,9 +58,7 @@ public:
 	bool atGoal;
 	bool haveFinalWaypoint;
 
-	float terrainSpeed;
 	float requestedSpeed;
-	short requestedTurnRate;
 
 	float currentDistanceToWaypoint;
 
@@ -71,8 +69,6 @@ public:
 	unsigned int etaFailures;
 	/// how many times we have requested a path from the same place
 	unsigned int nonMovingFailures;
-
-	bool floatOnWater;
 
 	int moveSquareX;
 	int moveSquareY;
@@ -89,7 +85,7 @@ protected:
 	void GetNewPath();
 	void GetNextWaypoint();
 
-	float BreakingDistance(float speed);
+	float BreakingDistance(float speed) const;
 	float3 Here();
 
 	void StartEngine();
@@ -97,22 +93,20 @@ protected:
 
 	void Arrived();
 	void Fail();
-	void CheckCollision(void);
+	void HandleObjectCollisions();
 
 	void ChangeHeading(short wantedHeading);
 
-	void UpdateSkid(void);
-	void UpdateControlledDrop(void);
-	void CheckCollisionSkid(void);
-	float GetFlyTime(float3 pos, float3 speed);
-	void CalcSkidRot(void);
+	void UpdateSkid();
+	void UpdateControlledDrop();
+	void CheckCollisionSkid();
+	void CalcSkidRot();
 
+	float GetGroundHeight(const float3&) const;
 	void AdjustPosToWaterLine();
 	bool UpdateDirectControl();
 	void UpdateOwnerPos(bool);
 	bool WantReverse(const float3&) const;
-
-	void UpdateHeatMap();
 
 	bool skidding;
 	bool flying;
@@ -129,9 +123,6 @@ protected:
 	float skidRotPos2;
 	CSolidObject::PhysicalState oldPhysState;
 
-	bool CheckColH(int x, int y1, int y2, float xmove, int squareTestX);
-	bool CheckColV(int y, int x1, int x2, float zmove, int squareTestY);
-
 	// number of grid-cells along each dimension; should be an odd number
 	static const int LINETABLE_SIZE = 11;
 	static std::vector<int2> lineTable[LINETABLE_SIZE][LINETABLE_SIZE];
@@ -141,14 +132,14 @@ protected:
 	void SetMainHeading();
 
 public:
-	static void CreateLineTable(void);
-	static void DeleteLineTable(void);
+	static void CreateLineTable();
+	static void DeleteLineTable();
 
-	void TestNewTerrainSquare(void);
-	virtual void LeaveTransport(void);
+	void TestNewTerrainSquare();
+	void LeaveTransport();
 
-	void StartSkidding(void);
-	void StartFlying(void);
+	void StartSkidding();
+	void StartFlying();
 
 	bool IsSkidding() const { return skidding; }
 	bool IsFlying() const { return flying; }

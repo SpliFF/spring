@@ -3,11 +3,7 @@
 #ifndef __COMMAND_QUEUE_H__
 #define __COMMAND_QUEUE_H__
 
-#ifndef BUILDING_AI
 #include "lib/gml/gml.h"
-#else
-#define GML_STDMUTEX_LOCK(x)
-#endif
 
 #include <deque>
 #include "Command.h"
@@ -17,7 +13,6 @@ class CCommandQueue {
 
 	friend class CCommandAI;
 	friend class CFactoryCAI;
-	friend class CAIAICallback; // the C++ AI interface wrapper
 
 	// see CommandAI.cpp for further creg stuff for this class
 	CR_DECLARE(CCommandQueue);

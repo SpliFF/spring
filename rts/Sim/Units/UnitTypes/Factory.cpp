@@ -76,10 +76,10 @@ void CFactory::PostLoad()
 	}
 }
 
-void CFactory::UnitInit (const UnitDef* def, int team, const float3& position)
+void CFactory::PreInit(const UnitDef* def, int team, int facing, const float3& position, bool build)
 {
 	buildSpeed = def->buildSpeed / TEAM_SLOWUPDATE_RATE;
-	CBuilding::UnitInit(def, team, position);
+	CBuilding::PreInit(def, team, facing, position, build);
 }
 
 int CFactory::GetBuildPiece()
@@ -136,7 +136,7 @@ void CFactory::Update()
 					unitDef->sounds.build.getVolume(0));
 			}
 		} else {
-			helper->BuggerOff(buildPos - float3(0.01f, 0, 0.02f), radius + 8, true, true, NULL);
+			helper->BuggerOff(buildPos - float3(0.01f, 0, 0.02f), radius + 8, true, true, team, NULL);
 		}
 	}
 
@@ -149,21 +149,18 @@ void CFactory::Update()
 
 			// buildPiece is the rotating platform
 			const int buildPiece = GetBuildPiece();
+			const float3& buildPos = CalcBuildPos(buildPiece);
 			const CMatrix44f& mat = script->GetPieceMatrix(buildPiece);
 			const int h = GetHeadingFromVector(mat[2], mat[10]); //! x.z, z.z
 
 			// rotate unit nanoframe with platform
-			curBuild->heading = (h + GetHeadingFromFacing(buildFacing)) & 65535;
-
-			const float3 buildPos = CalcBuildPos(buildPiece);
+			curBuild->heading = (h + GetHeadingFromFacing(buildFacing)) & (SPRING_CIRCLE_DIVS - 1);
 			curBuild->pos = buildPos;
 
-			if (curBuild->floatOnWater) {
-				float waterline = ground->GetHeight(buildPos.x, buildPos.z) - curBuild->unitDef->waterline;
-				if (waterline > curBuild->pos.y)
-					curBuild->pos.y = waterline;
-			}
-			curBuild->midPos = curBuild->pos + (UpVector * curBuild->relMidPos.y);
+			if (curBuild->floatOnWater && (buildPos.y <= 0.0f))
+				curBuild->pos.y = -curBuild->unitDef->waterline;
+
+			curBuild->UpdateMidPos();
 
 			const CCommandQueue& queue = commandAI->commandQue;
 
@@ -272,7 +269,7 @@ void CFactory::SendToEmptySpot(CUnit* unit)
 
 	for (int a = 0; a < 20; ++a) {
 		float3 testPos = pos + frontdir * r * cos(a * PI / 10) + rightdir * r * sin(a * PI / 10);
-		testPos.y = ground->GetHeight(testPos.x, testPos.z);
+		testPos.y = ground->GetHeightAboveWater(testPos.x, testPos.z);
 
 		if (qf->GetSolidsExact(testPos, unit->radius * 1.5f).empty()) {
 			foundPos = testPos;
@@ -345,7 +342,7 @@ void CFactory::AssignBuildeeOrders(CUnit* unit) {
 void CFactory::SlowUpdate(void)
 {
 	if (!transporter)
-		helper->BuggerOff(pos - float3(0.01f, 0, 0.02f), radius, true, true, NULL);
+		helper->BuggerOff(pos - float3(0.01f, 0, 0.02f), radius, true, true, team, NULL);
 	CBuilding::SlowUpdate();
 }
 

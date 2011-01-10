@@ -211,7 +211,7 @@ CCommandAI::CCommandAI(CUnit* owner):
 		c.type = CMDTYPE_ICON_MODE;
 		c.name = "Fire state";
 		c.mouseicon = c.name;
-		c.params.push_back("2");
+		c.params.push_back(IntToString(FIRESTATE_FIREATWILL));
 		c.params.push_back("Hold fire");
 		c.params.push_back("Return fire");
 		c.params.push_back("Fire at will");
@@ -227,7 +227,7 @@ CCommandAI::CCommandAI(CUnit* owner):
 		c.type = CMDTYPE_ICON_MODE;
 		c.name = "Move state";
 		c.mouseicon = c.name;
-		c.params.push_back("1");
+		c.params.push_back(IntToString(MOVESTATE_MANEUVER));
 		c.params.push_back("Hold pos");
 		c.params.push_back("Maneuver");
 		c.params.push_back("Roam");
@@ -235,7 +235,7 @@ CCommandAI::CCommandAI(CUnit* owner):
 		possibleCommands.push_back(c);
 		nonQueingCommands.insert(CMD_MOVE_STATE);
 	} else {
-		owner->moveState = 0;
+		owner->moveState = MOVESTATE_HOLDPOS;
 	}
 
 	if (owner->unitDef->canRepeat) {
@@ -335,8 +335,9 @@ vector<CommandDescription>& CCommandAI::GetPossibleCommands()
 bool CCommandAI::isAttackCapable() const
 {
 	const UnitDef* ud = owner->unitDef;
-	return (ud->canAttack &&
-	        (!ud->weapons.empty() || ud->canKamikaze || (ud->type == "Factory")));
+	const bool b = (!ud->weapons.empty() || ud->canKamikaze || (ud->IsFactoryUnit()));
+
+	return (ud->canAttack && b);
 }
 
 
@@ -347,7 +348,7 @@ static inline const CUnit* GetCommandUnit(const Command& c, int idx) {
 	}
 
 	if (c.IsAreaCommand()) {
-		return false;
+		return NULL;
 	}
 
 	const CUnit* unit = uh->GetUnit(c.params[idx]);
@@ -420,7 +421,7 @@ bool CCommandAI::AllowedCommand(const Command& c, bool fromSynced)
 
 					// check if attack ground is really attack ground
 					if (!aiOrder && !fromSynced &&
-						fabs(cPos.y - ground->GetHeight2(cPos.x, cPos.z)) > SQUARE_SIZE) {
+						fabs(cPos.y - ground->GetHeightReal(cPos.x, cPos.z)) > SQUARE_SIZE) {
 						return false;
 					}
 				}
@@ -453,15 +454,16 @@ bool CCommandAI::AllowedCommand(const Command& c, bool fromSynced)
 			const CUnit* reclaimeeUnit = GetCommandUnit(c, 0);
 			const CFeature* reclaimeeFeature = NULL;
 
+			if (c.IsAreaCommand()) { return true; }
 			if (!ud->canReclaim) { return false; }
 			if (reclaimeeUnit && !reclaimeeUnit->unitDef->reclaimable) { return false; }
 			if (reclaimeeUnit && !reclaimeeUnit->AllowedReclaim(owner)) { return false; }
 			if (reclaimeeUnit && !reclaimeeUnit->pos.IsInBounds()) { return false; }
 
-			if (reclaimeeUnit == NULL && !c.IsAreaCommand()) {
+			if (reclaimeeUnit == NULL && !c.params.empty()) {
 				const unsigned int reclaimeeFeatureID(c.params[0]);
 
-				if (!c.params.empty() && reclaimeeFeatureID >= uh->MaxUnits()) {
+				if (reclaimeeFeatureID >= uh->MaxUnits()) {
 					reclaimeeFeature = featureHandler->GetFeature(reclaimeeFeatureID - uh->MaxUnits());
 
 					if (reclaimeeFeature && !reclaimeeFeature->def->reclaimable) {
@@ -1614,10 +1616,11 @@ bool CCommandAI::SkipParalyzeTarget(const CUnit* target)
 	return false;
 }
 
-bool CCommandAI::CanChangeFireState(){
-	return owner->unitDef->canFireControl &&
-		(!owner->unitDef->weapons.empty() || owner->unitDef->type=="Factory" ||
-				owner->unitDef->canKamikaze);
+bool CCommandAI::CanChangeFireState() {
+	const UnitDef* ud = owner->unitDef;
+	const bool b = (!ud->weapons.empty() || ud->canKamikaze || ud->IsFactoryUnit());
+
+	return (ud->canFireControl && b);
 }
 
 /// remove attack commands targeted at our new ally

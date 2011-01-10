@@ -106,6 +106,12 @@ EXPORT(float            ) skirmishAiCallback_Game_getSpeedFactor(int skirmishAII
 
 EXPORT(const char*      ) skirmishAiCallback_Game_getSetupScript(int skirmishAIId);
 
+EXPORT(int              ) skirmishAiCallback_Game_getCategoryFlag(int skirmishAIId, const char* categoryName);
+
+EXPORT(int              ) skirmishAiCallback_Game_getCategoriesFlag(int skirmishAIId, const char* categoryNames);
+
+EXPORT(void             ) skirmishAiCallback_Game_getCategoryName(int skirmishAIId, int categoryFlag, char* name, int name_sizeMax);
+
 // END misc callback functions
 
 
@@ -574,7 +580,9 @@ EXPORT(int              ) skirmishAiCallback_UnitDef_MoveData_getMoveType(int sk
 
 EXPORT(int              ) skirmishAiCallback_UnitDef_MoveData_getMoveFamily(int skirmishAIId, int unitDefId);
 
-EXPORT(int              ) skirmishAiCallback_UnitDef_MoveData_getSize(int skirmishAIId, int unitDefId);
+EXPORT(int              ) skirmishAiCallback_UnitDef_MoveData_getXSize(int skirmishAIId, int unitDefId);
+
+EXPORT(int              ) skirmishAiCallback_UnitDef_MoveData_getZSize(int skirmishAIId, int unitDefId);
 
 EXPORT(float            ) skirmishAiCallback_UnitDef_MoveData_getDepth(int skirmishAIId, int unitDefId);
 

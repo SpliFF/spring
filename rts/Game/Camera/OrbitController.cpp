@@ -1,19 +1,18 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#include "StdAfx.h"
+#include <boost/cstdint.hpp>
 
 #include <SDL_mouse.h>
 #include <SDL_keysym.h>
 
+#include "StdAfx.h"
 #include "OrbitController.h"
 #include "Game/Camera.h"
 #include "Game/UI/MouseHandler.h"
 #include "Map/Ground.h"
-#include "LogOutput.h"
-#include "ConfigHandler.h"
-#include <boost/cstdint.hpp>
-
-extern boost::uint8_t* keys;
+#include "System/LogOutput.h"
+#include "System/ConfigHandler.h"
+#include "System/Input/KeyInput.h"
 
 #define DEG2RAD(a) ((a) * (3.141592653f / 180.0f))
 #define RAD2DEG(a) ((a) * (180.0f / 3.141592653f))
@@ -65,7 +64,7 @@ void COrbitController::Init(const float3& p, const float3& tar)
 
 void COrbitController::Update()
 {
-	if (!keys[SDLK_LMETA]) {
+	if (!keyInput->IsKeyPressed(SDLK_LMETA)) {
 		return;
 	}
 
@@ -154,7 +153,7 @@ void COrbitController::Orbit()
 	CCamera* cam = camera;
 
 	cam->pos = cen + GetOrbitPos();
-	cam->pos.y = std::max(cam->pos.y, ground->GetHeight2(cam->pos.x, cam->pos.z));
+	cam->pos.y = std::max(cam->pos.y, ground->GetHeightReal(cam->pos.x, cam->pos.z));
 	cam->forward = (cen - cam->pos).ANormalize();
 	cam->up = YVEC;
 }
@@ -173,8 +172,8 @@ void COrbitController::Pan(int rdx, int rdy)
 
 
 	// don't allow orbit center or ourselves to drop below the terrain
-	const float camGH = ground->GetHeight2(cam->pos.x, cam->pos.z);
-	const float cenGH = ground->GetHeight2(cen.x, cen.z);
+	const float camGH = ground->GetHeightReal(cam->pos.x, cam->pos.z);
+	const float cenGH = ground->GetHeightReal(cen.x, cen.z);
 
 	if (cam->pos.y < camGH) {
 		cam->pos.y = camGH;
@@ -220,7 +219,7 @@ float3 COrbitController::GetPos()
 
 void COrbitController::SetPos(const float3& newPos)
 {
-	if (keys[SDLK_LMETA]) {
+	if (keyInput->IsKeyPressed(SDLK_LMETA)) {
 		return;
 	}
 
@@ -230,7 +229,7 @@ void COrbitController::SetPos(const float3& newPos)
 
 	cen.x += dx;
 	cen.z += dz;
-	cen.y = ground->GetHeight2(cen.x, cen.z);
+	cen.y = ground->GetHeightReal(cen.x, cen.z);
 
 	camera->pos.x += dx;
 	camera->pos.z += dz;

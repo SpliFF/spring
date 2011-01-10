@@ -7,8 +7,11 @@
 #include "Map/ReadMap.h"
 #include "LogOutput.h"
 #include "Map/Ground.h"
+#include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Misc/GroundBlockingObjectMap.h"
 #include "myMath.h"
+
+const float CSolidObject::DEFAULT_MASS = 100000.0f;
 
 CR_BIND_DERIVED(CSolidObject, CWorldObject, );
 CR_REG_METADATA(CSolidObject,
@@ -43,7 +46,7 @@ CR_REG_METADATA(CSolidObject,
 
 
 CSolidObject::CSolidObject():
-	mass(100000),
+	mass(DEFAULT_MASS),
 	blocking(false),
 	floatOnWater(false),
 	immobile(false),
@@ -66,12 +69,17 @@ CSolidObject::CSolidObject():
 	buildFacing(0)
 {
 	mapPos = GetMapPos();
+	collisionVolume = NULL; //FIXME create collision volume with CWorldObject.radius?
 }
 
 CSolidObject::~CSolidObject() {
+	blocking = false;
+
 	delete mobility;
 	mobility = NULL;
-	blocking = false;
+
+	delete collisionVolume;
+	collisionVolume = NULL;
 }
 
 

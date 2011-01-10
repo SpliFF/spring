@@ -133,11 +133,11 @@ bool CBeamLaser::TryTarget(const float3& pos, bool userTarget, CUnit* unit)
 		return false;
 	}
 	if (avoidFriendly) {
-		if (helper->TestAllyCone(weaponMuzzlePos, dir, length, spread, owner->allyteam, owner))
+		if (helper->TestCone(weaponMuzzlePos, dir, length, spread, owner, CGameHelper::TEST_ALLIED))
 			return false;
 	}
 	if (avoidNeutral) {
-		if (helper->TestNeutralCone(weaponMuzzlePos, dir, length, spread, owner))
+		if (helper->TestCone(weaponMuzzlePos, dir, length, spread, owner, CGameHelper::TEST_NEUTRAL))
 			return false;
 	}
 
@@ -289,6 +289,8 @@ void CBeamLaser::FireInternal(float3 dir, bool sweepFire)
 	if (hitUnit) {
 		if (hitUnit->unitDef->usePieceCollisionVolumes) {
 			// getting the actual piece here is probably overdoing it
+			// TODO change this if we really need propper flanking bonus support
+			// for beam-lasers
 			hitUnit->SetLastAttackedPiece(hitUnit->localmodel->GetRoot(), gs->frameNum);
 		}
 

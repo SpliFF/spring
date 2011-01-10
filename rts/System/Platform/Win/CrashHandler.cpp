@@ -27,6 +27,7 @@ extern volatile int gmlMultiThreadSim;
 
 HANDLE simthread = INVALID_HANDLE_VALUE; // used in gmlsrv.h as well
 HANDLE drawthread = INVALID_HANDLE_VALUE;
+#define MAX_STACK_DEPTH 4096
 
 
 namespace CrashHandler {
@@ -143,7 +144,7 @@ static void Stacktrace(LPEXCEPTION_POINTERS e, HANDLE hThread = INVALID_HANDLE_V
 			SymGetModuleBase,
 			NULL
 		);
-		if (!more || sf.AddrFrame.Offset == 0) {
+		if (!more || sf.AddrFrame.Offset == 0 || count > MAX_STACK_DEPTH) {
 			break;
 		}
 
@@ -182,6 +183,8 @@ static void Stacktrace(LPEXCEPTION_POINTERS e, HANDLE hThread = INVALID_HANDLE_V
 		containsOglDll = containsOglDll || strstr(modname, "atiogl");
 		// OpenGL lib names (Nvidia): "nvoglnt.dll" "nvoglv32.dll" "nvoglv64.dll" (last one is a guess)
 		containsOglDll = containsOglDll || strstr(modname, "nvogl");
+		// OpenGL lib names (Intel): "ig4dev32.dll" "ig4dev64.dll"
+		containsOglDll = containsOglDll || strstr(modname, "ig4dev");
 
 		++count;
 	}

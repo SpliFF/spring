@@ -1,24 +1,26 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
-#ifndef IAICHEATS_H
-#define IAICHEATS_H
+#ifndef I_AI_CHEATS_H
+#define I_AI_CHEATS_H
 
-#include "Sim/Units/CommandAI/Command.h"
-#include "Sim/Misc/GlobalConstants.h" // needed for MAX_UNITS
-#include "float3.h"
+#include "Command.h"
 #include "IAICallback.h"
+#include "Sim/Misc/GlobalConstants.h" // needed for MAX_UNITS
+#include "System/float3.h"
 
 struct UnitDef;
+struct UnitResourceInfo;
 
+/**
+ * note that all of the non-readonly commands are network-
+ * insecure: they aren't transmitted over the network and
+ * thus will cause sync errors, so do not use them when 2
+ * or more players are around (although you actually can't,
+ * since they call OnlyPassiveCheats() internally)
+ */
 class IAICheats
 {
 public:
-	// note that all of the non-readonly commands are network-
-	// insecure: they aren't transmitted over the network and
-	// thus will cause sync errors, so do not use them when 2
-	// or more players are around (although you actually can't,
-	// since they call OnlyPassiveCheats() internally)
-
 	/**
 	 * This function has the same effect as setting a handicap value
 	 * in the GameSetup script (currently gives a bonus on collected
@@ -35,9 +37,11 @@ public:
 	virtual int CreateUnit(const char* name, float3 pos) = 0;
 
 
+	/*
+	 * the following commands work exactly like those in the standard
+	 * callback interface, except that they don't do any LOS checks
+	 */
 
-	// the following commands work exactly like those in the standard
-	// callback interface, except that they don't do any LOS checks
 	virtual const UnitDef* GetUnitDef(int unitId) = 0;
 
 	virtual float3 GetUnitPos(int unitId) = 0;
@@ -84,4 +88,4 @@ public:
 	virtual ~IAICheats() {}
 };
 
-#endif // IAICHEATS_H
+#endif // I_AI_CHEATS_H

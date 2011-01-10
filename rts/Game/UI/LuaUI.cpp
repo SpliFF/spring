@@ -67,20 +67,7 @@
 
 using namespace std;
 
-#if (LUA_VERSION_NUM < 500)
-#  define LUA_OPEN_LIB(L, lib) lib(L)
-#else
-#  define LUA_OPEN_LIB(L, lib) \
-     lua_pushcfunction((L), lib); \
-     lua_pcall((L), 0, 0, 0);
-#endif
-
-
-extern boost::uint8_t *keys;
-
-
 CLuaUI* luaUI = NULL;
-
 
 const int CMD_INDEX_OFFSET = 1; // starting index for command descriptions
 

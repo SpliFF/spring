@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 #include <limits.h> // for INT_MAX
-#include "creg/creg_cond.h"
+#include "System/creg/creg_cond.h"
 
 // cmds lower than 0 is reserved for build options (cmd -x = unitdefs[x])
 #define CMD_STOP                   0
@@ -91,6 +91,19 @@
 
 #define INTERNAL_ORDER  (DONT_REPEAT)
 
+enum {
+	MOVESTATE_NONE     = -1,
+	MOVESTATE_HOLDPOS  =  0,
+	MOVESTATE_MANEUVER =  1,
+	MOVESTATE_ROAM     =  2,
+};
+enum {
+	FIRESTATE_NONE       = -1,
+	FIRESTATE_HOLDFIRE   =  0,
+	FIRESTATE_RETURNFIRE =  1,
+	FIRESTATE_FIREATWILL =  2,
+};
+
 
 struct Command
 {
@@ -104,6 +117,7 @@ public:
 		options(0),
 		tag(0),
 		timeOut(INT_MAX) {}
+	~Command() { params.clear(); }
 
 	bool IsAreaCommand() const {
 		if (id == CMD_REPAIR ||

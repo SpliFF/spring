@@ -17,7 +17,7 @@
 	#include "System/Sync/SyncTracer.h"
 #endif
 
-CR_BIND_DERIVED(CExplosiveProjectile, CWeaponProjectile, (float3(0, 0, 0), float3(0, 0, 0), NULL, NULL, 1, 0));
+CR_BIND_DERIVED(CExplosiveProjectile, CWeaponProjectile, (ZeroVector, ZeroVector, NULL, NULL, 1, 0));
 
 CR_REG_METADATA(CExplosiveProjectile, (
 	CR_SETFLAG(CF_Synced),
@@ -30,13 +30,12 @@ CR_REG_METADATA(CExplosiveProjectile, (
 //////////////////////////////////////////////////////////////////////
 
 CExplosiveProjectile::CExplosiveProjectile(
-	const float3& pos, const float3& speed,
-	CUnit* owner, const WeaponDef *weaponDef,
-	int ttl, float areaOfEffect, float g):
-
-	CWeaponProjectile(pos, speed, owner, 0, ZeroVector, weaponDef, 0, ttl),
-	areaOfEffect(areaOfEffect),
-	curTime(0)
+		const float3& pos, const float3& speed,
+		CUnit* owner, const WeaponDef* weaponDef,
+		int ttl, float areaOfEffect, float g)
+	: CWeaponProjectile(pos, speed, owner, NULL, ZeroVector, weaponDef, NULL, ttl)
+	, areaOfEffect(areaOfEffect)
+	, curTime(0)
 {
 	projectileType = WEAPON_EXPLOSIVE_PROJECTILE;
 
@@ -49,45 +48,40 @@ CExplosiveProjectile::CExplosiveProjectile(
 		drawRadius = weaponDef->size;
 	}
 
-	if (ttl <= 0)
+	if (ttl <= 0) {
 		invttl = 1;
-	else
+	} else {
 		invttl = 1.0f / ttl;
+	}
 
 #ifdef TRACE_SYNC
 	tracefile << "New explosive: ";
 	tracefile << pos.x << " " << pos.y << " " << pos.z << " " << speed.x << " " << speed.y << " " << speed.z << "\n";
 #endif
 
-
-	if (!cegTag.empty()) {
-		ceg.Load(explGenHandler, cegTag);
-	}
-}
-
-CExplosiveProjectile::~CExplosiveProjectile()
-{
-
+	cegID = gCEG->Load(explGenHandler, cegTag);
 }
 
 void CExplosiveProjectile::Update()
 {
-	if (!luaMoveCtrl) {
-		pos += speed;
-		speed.y += mygravity;
-	}
+//	if (!luaMoveCtrl) {
+//		pos += speed;
+//		speed.y += mygravity;
+//	}
+	CProjectile::Update();
 
 	if (--ttl == 0) {
 		Collision();
 	} else {
-		if (!cegTag.empty() && ttl > 0) {
-			ceg.Explosion(pos, ttl, areaOfEffect, 0x0, 0.0f, 0x0, speed);
+		if (ttl > 0) {
+			gCEG->Explosion(cegID, pos, ttl, areaOfEffect, NULL, 0.0f, NULL, speed);
 		}
 	}
 
 	if (weaponDef->noExplode) {
-		if (TraveledRange())
+		if (TraveledRange()) {
 			CProjectile::Collision();
+		}
 	}
 
 	curTime += invttl;
@@ -100,12 +94,12 @@ void CExplosiveProjectile::Update()
 void CExplosiveProjectile::Collision()
 {
 	if (!weaponDef->noExplode) {
-		float h=ground->GetHeight2(pos.x,pos.z);
-		if(h>pos.y){
-			float3 n=ground->GetNormal(pos.x,pos.z);
-			pos-=speed*std::max(0.0f,std::min(1.0f,float((h-pos.y)*n.y/n.dot(speed)+0.1f)));
-		}
-		else if (weaponDef->waterweapon) {
+		const float h = ground->GetHeightReal(pos.x, pos.z);
+		const float3& n = ground->GetNormal(pos.x, pos.z);
+
+		if (h > pos.y) {
+			pos -= speed * std::max(0.0f, std::min(1.0f, float((h - pos.y) * n.y / n.dot(speed) + 0.1f)));
+		} else if (weaponDef->waterweapon) {
 			return; //let waterweapons go underwater
 		}
 	}
@@ -113,26 +107,29 @@ void CExplosiveProjectile::Collision()
 	CWeaponProjectile::Collision();
 }
 
-void CExplosiveProjectile::Collision(CUnit *unit)
+void CExplosiveProjectile::Collision(CUnit* unit)
 {
 	CWeaponProjectile::Collision(unit);
 }
 
-void CExplosiveProjectile::Draw(void)
+void CExplosiveProjectile::Draw()
 {
-	if (model) { //dont draw if a 3d model has been defined for us
+	if (model) {
+		// do not draw if a 3D model has been defined for us
 		return;
 	}
 
 	inArray = true;
-	unsigned char col[4];
+
+	unsigned char col[4] = {0};
+
 	if (weaponDef->visuals.colorMap) {
 		weaponDef->visuals.colorMap->GetColor(col, curTime);
 	} else {
-		col[0] = int(weaponDef->visuals.color.x * 255);
-		col[1] = int(weaponDef->visuals.color.y * 255);
-		col[2] = int(weaponDef->visuals.color.z * 255);
-		col[3] = int(weaponDef->intensity * 255);
+		col[0] = weaponDef->visuals.color.x * 255;
+		col[1] = weaponDef->visuals.color.y * 255;
+		col[2] = weaponDef->visuals.color.z * 255;
+		col[3] = weaponDef->intensity       * 255;
 	}
 
 	const AtlasedTexture* tex = weaponDef->visuals.texture1;
@@ -141,28 +138,30 @@ void CExplosiveProjectile::Draw(void)
 	const float  separation = weaponDef->visuals.separation;
 	const bool   noGap      = weaponDef->visuals.noGap;
 	const int    stages     = weaponDef->visuals.stages;
-	const float  invStages  = 1.0f / (float)stages;
+	const float  invStages  = 1.0f / stages;
 
 	const float3 ndir = dir * separation * 0.6f;
 
 	va->EnlargeArrays(stages * 4,0, VA_SIZE_TC);
 
-	for (int a = 0; a < stages; ++a) { //! CAUTION: loop count must match EnlargeArrays above
-		const float aDecay = (stages - (a * alphaDecay)) * invStages;
-		col[0] = int(aDecay * col[0]);
-		col[1] = int(aDecay * col[1]);
-		col[2] = int(aDecay * col[2]);
-		col[3] = int(aDecay * col[3]);
+	for (int stage = 0; stage < stages; ++stage) { //! CAUTION: loop count must match EnlargeArrays above
+		const float stageDecay = (stages - (stage * alphaDecay)) * invStages;
+		const float stageSize  = drawRadius * (1.0f - (stage * sizeDecay));
 
-		const float  size  = drawRadius * (1.0f - (a * sizeDecay));
-		const float3 up    = camera->up    * size;
-		const float3 right = camera->right * size;
-		const float3 interPos2 = drawPos - ((noGap)? (ndir * size * a): (ndir * drawRadius * a));
+		const float3 ydirCam  = camera->up    * stageSize;
+		const float3 xdirCam  = camera->right * stageSize;
+		const float3 stageGap = (noGap)? (ndir * stageSize * stage): (ndir * drawRadius * stage);
+		const float3 stagePos = drawPos - stageGap;
 
-		va->AddVertexQTC(interPos2 - right - up, tex->xstart, tex->ystart, col);
-		va->AddVertexQTC(interPos2 + right - up, tex->xend,   tex->ystart, col);
-		va->AddVertexQTC(interPos2 + right + up, tex->xend,   tex->yend,   col);
-		va->AddVertexQTC(interPos2 - right + up, tex->xstart, tex->yend,   col);
+		col[0] = stageDecay * col[0];
+		col[1] = stageDecay * col[1];
+		col[2] = stageDecay * col[2];
+		col[3] = stageDecay * col[3];
+
+		va->AddVertexQTC(stagePos - xdirCam - ydirCam, tex->xstart, tex->ystart, col);
+		va->AddVertexQTC(stagePos + xdirCam - ydirCam, tex->xend,   tex->ystart, col);
+		va->AddVertexQTC(stagePos + xdirCam + ydirCam, tex->xend,   tex->yend,   col);
+		va->AddVertexQTC(stagePos - xdirCam + ydirCam, tex->xstart, tex->yend,   col);
 	}
 }
 

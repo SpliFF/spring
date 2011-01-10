@@ -75,18 +75,16 @@ CBeamLaserProjectile::CBeamLaserProjectile(
 		midtexx = 0.0f;
 	}
 
-	if (!cegTag.empty()) {
-		ceg.Load(explGenHandler, cegTag);
-	}
+	cegID = gCEG->Load(explGenHandler, cegTag);
 }
 
 
 
-void CBeamLaserProjectile::Update(void)
+void CBeamLaserProjectile::Update()
 {
-	if (ttl <= 0)
+	if (ttl <= 0) {
 		deleteMe = true;
-	else {
+	} else {
 		ttl--;
 		for (int i = 0; i < 3; i++) {
 			corecolstart[i] = (corecolstart[i] * decay);
@@ -95,13 +93,11 @@ void CBeamLaserProjectile::Update(void)
 			kocolend[i] = (kocolend[i] * decay);
 		}
 
-		if (!cegTag.empty()) {
-			ceg.Explosion(startPos + ((endPos - startPos) / ttl), 0.0f, flaresize, 0x0, 0.0f, 0x0, endPos - startPos);
-		}
+		gCEG->Explosion(cegID, startPos + ((endPos - startPos) / ttl), 0.0f, flaresize, 0x0, 0.0f, 0x0, endPos - startPos);
 	}
 }
 
-void CBeamLaserProjectile::Draw(void)
+void CBeamLaserProjectile::Draw()
 {
 	inArray = true;
 
@@ -182,7 +178,7 @@ void CBeamLaserProjectile::Draw(void)
 
 void CBeamLaserProjectile::DrawOnMinimap(CVertexArray& lines, CVertexArray& points)
 {
-	unsigned char color[4] = {kocolstart[0], kocolstart[1], kocolstart[2], 255};
+	unsigned char color[4] = { kocolstart[0], kocolstart[1], kocolstart[2], 255 };
 	lines.AddVertexQC(startPos, color);
 	lines.AddVertexQC(endPos, color);
 }

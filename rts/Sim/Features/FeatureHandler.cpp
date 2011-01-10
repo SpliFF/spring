@@ -70,32 +70,21 @@ CFeatureHandler::CFeatureHandler()
 	}
 }
 
-
 CFeatureHandler::~CFeatureHandler()
 {
 	for (CFeatureSet::iterator fi = activeFeatures.begin(); fi != activeFeatures.end(); ++fi) {
-		// unsavory, but better than a memleak
-		FeatureDef* fd = (FeatureDef*) (*fi)->def;
-
-		delete fd->collisionVolume;
-		fd->collisionVolume = NULL;
 		delete *fi;
+	}
+
+	for (std::map<std::string, const FeatureDef*>::iterator it = featureDefs.begin(); it != featureDefs.end(); ++it) {
+		delete it->second;
 	}
 
 	activeFeatures.clear();
 	features.clear();
-
-	while (!featureDefs.empty()) {
-		map<string, const FeatureDef*>::iterator fi = featureDefs.begin();
-
-		FeatureDef* fd = (FeatureDef*) fi->second;
-
-		delete fd->collisionVolume;
-		fd->collisionVolume = NULL;
-		delete fi->second;
-		featureDefs.erase(fi);
-	}
+	featureDefs.clear();
 }
+
 
 
 void CFeatureHandler::AddFeatureDef(const string& name, FeatureDef* fd)
@@ -263,9 +252,9 @@ void CFeatureHandler::LoadFeaturesFromMap(bool onlyCreateDefs)
 				fd->xsize = 0;
 				fd->zsize = 0;
 				fd->myName = name;
-				fd->mass = 100000;
+				fd->mass = CSolidObject::DEFAULT_MASS;
 				// geothermals have no collision volume at all
-				fd->collisionVolume = 0;
+				fd->collisionVolume = NULL;
 				AddFeatureDef(name, fd);
 			}
 			else {
@@ -289,7 +278,7 @@ void CFeatureHandler::LoadFeaturesFromMap(bool onlyCreateDefs)
 				continue;
 			}
 
-			const float ypos = ground->GetHeight2(mfi[a].pos.x, mfi[a].pos.z);
+			const float ypos = ground->GetHeightReal(mfi[a].pos.x, mfi[a].pos.z);
 			(new CFeature)->Initialize(
 				float3(mfi[a].pos.x, ypos, mfi[a].pos.z),
 				def->second, (short int) mfi[a].rotation,
@@ -458,10 +447,10 @@ void CFeatureHandler::TerrainChanged(int x1, int y1, int x2, int y2)
 		for (fi = features.begin(); fi != features.end(); ++fi) {
 			CFeature* feature = *fi;
 			float3& fpos = feature->pos;
-			float gh = ground->GetHeight2(fpos.x, fpos.z);
+			float gh = ground->GetHeightReal(fpos.x, fpos.z);
 			float wh = gh;
 			if(feature->def->floating)
-				wh = ground->GetHeight(fpos.x, fpos.z);
+				wh = ground->GetHeightAboveWater(fpos.x, fpos.z);
 			if (fpos.y > wh || fpos.y < gh) {
 				feature->finalHeight = wh;
 				feature->reachedFinalPos = false;

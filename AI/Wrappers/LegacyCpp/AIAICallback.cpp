@@ -16,22 +16,18 @@
 */
 
 #include "AIAICallback.h"
-#include "UnitDef.h"
 
 #include "ExternalAI/Interface/SSkirmishAICallback.h"
 #include "ExternalAI/Interface/AISCommands.h"
 
-#include "creg/creg_cond.h"
-#include "Sim/Units/CommandAI/CommandQueue.h"
-#ifdef USING_CREG
-creg::Class* CCommandQueue::GetClass() { return NULL; }
-#endif
-#include "Sim/MoveTypes/MoveInfo.h"
-CIcon::CIcon() {}
-CIcon::~CIcon() {}
-#include "Sim/Features/FeatureDef.h"
-#include "Sim/Weapons/WeaponDefHandler.h"
-WeaponDef::~WeaponDef() {}
+// these are all copies from the engine, so we do not have to adjust
+// to each minor change done there
+#include "MoveData.h"
+#include "UnitDef.h"
+#include "WeaponDef.h"
+#include "FeatureDef.h"
+#include "Command.h"
+#include "CommandQueue.h"
 
 #include <string>
 #include <string.h>
@@ -644,19 +640,17 @@ const UnitDef* CAIAICallback::GetUnitDefById(int unitDefId) {
 		{
 			static const size_t facings = 4;
 			const int yardMap_size = sAICallback->UnitDef_getYardMap(skirmishAIId, unitDefId, 0, NULL, 0);
-			short tmpYardMaps[facings][yardMap_size];
-			int ym;
-			for (ym = 0 ; ym < facings; ++ym) {
-				sAICallback->UnitDef_getYardMap(skirmishAIId, unitDefId, ym, tmpYardMaps[ym], yardMap_size);
-			}
+			short* tmpYardMap = new short[yardMap_size];
 
-			int i;
-			for (ym = 0 ; ym < facings; ++ym) {
-				unitDef->yardmaps[ym] = new unsigned char[yardMap_size];
-				for (i = 0; i < yardMap_size; ++i) {
-					unitDef->yardmaps[ym][i] = (const char) tmpYardMaps[ym][i];
+			for (int ym = 0 ; ym < facings; ++ym) {
+				sAICallback->UnitDef_getYardMap(skirmishAIId, unitDefId, ym, tmpYardMap, yardMap_size);
+				unitDef->yardmaps[ym] = new unsigned char[yardMap_size]; // this will be deleted in the dtor
+				for (int i = 0; i < yardMap_size; ++i) {
+					unitDef->yardmaps[ym][i] = (const char) tmpYardMap[i];
 				}
 			}
+
+			delete[] tmpYardMap;
 		}
 		unitDef->xsize = sAICallback->UnitDef_getXSize(skirmishAIId, unitDefId);
 		unitDef->zsize = sAICallback->UnitDef_getZSize(skirmishAIId, unitDefId);
@@ -755,19 +749,19 @@ const UnitDef* CAIAICallback::GetUnitDefById(int unitDefId) {
 		}
 
 		if (sAICallback->UnitDef_isMoveDataAvailable(skirmishAIId, unitDefId)) {
-			unitDef->movedata = new MoveData(NULL);
+			unitDef->movedata = new MoveData();
 			unitDef->movedata->maxAcceleration = sAICallback->UnitDef_MoveData_getMaxAcceleration(skirmishAIId, unitDefId);
 			unitDef->movedata->maxBreaking = sAICallback->UnitDef_MoveData_getMaxBreaking(skirmishAIId, unitDefId);
 			unitDef->movedata->maxSpeed = sAICallback->UnitDef_MoveData_getMaxSpeed(skirmishAIId, unitDefId);
 			unitDef->movedata->maxTurnRate = sAICallback->UnitDef_MoveData_getMaxTurnRate(skirmishAIId, unitDefId);
 
-			unitDef->movedata->size = sAICallback->UnitDef_MoveData_getSize(skirmishAIId, unitDefId);
+			unitDef->movedata->xsize = sAICallback->UnitDef_MoveData_getXSize(skirmishAIId, unitDefId);
+			unitDef->movedata->zsize = sAICallback->UnitDef_MoveData_getZSize(skirmishAIId, unitDefId);
 			unitDef->movedata->depth = sAICallback->UnitDef_MoveData_getDepth(skirmishAIId, unitDefId);
 			unitDef->movedata->maxSlope = sAICallback->UnitDef_MoveData_getMaxSlope(skirmishAIId, unitDefId);
 			unitDef->movedata->slopeMod = sAICallback->UnitDef_MoveData_getSlopeMod(skirmishAIId, unitDefId);
 			unitDef->movedata->depthMod = sAICallback->UnitDef_MoveData_getDepthMod(skirmishAIId, unitDefId);
 			unitDef->movedata->pathType = sAICallback->UnitDef_MoveData_getPathType(skirmishAIId, unitDefId);
-			unitDef->movedata->moveMath = 0;
 			unitDef->movedata->crushStrength = sAICallback->UnitDef_MoveData_getCrushStrength(skirmishAIId, unitDefId);
 			unitDef->movedata->moveType = (enum MoveData::MoveType) sAICallback->UnitDef_MoveData_getMoveType(skirmishAIId, unitDefId);
 			unitDef->movedata->moveFamily = (enum MoveData::MoveFamily) sAICallback->UnitDef_MoveData_getMoveFamily(skirmishAIId, unitDefId);
@@ -898,10 +892,11 @@ const unsigned short* CAIAICallback::GetLosMap() {
 
 	if (losMap == NULL) {
 		const int size = sAICallback->Map_getLosMap(skirmishAIId, NULL, 0);
-		int tmpLosMap[size];
+		int* tmpLosMap = new int[size];
 		sAICallback->Map_getLosMap(skirmishAIId, tmpLosMap, size);
 		losMap = new unsigned short[size]; // NOTE: memory leak, but will be used till end of the game anyway
 		copyIntToUShortArray(tmpLosMap, losMap, size);
+		delete[] tmpLosMap;
 	}
 
 	return losMap;
@@ -919,10 +914,11 @@ const unsigned short* CAIAICallback::GetRadarMap() {
 
 	if (radarMap == NULL) {
 		const int size = sAICallback->Map_getRadarMap(skirmishAIId, NULL, 0);
-		int tmpRadarMap[size];
+		int* tmpRadarMap = new int[size];
 		sAICallback->Map_getRadarMap(skirmishAIId, tmpRadarMap, size);
 		radarMap = new unsigned short[size]; // NOTE: memory leak, but will be used till end of the game anyway
 		copyIntToUShortArray(tmpRadarMap, radarMap, size);
+		delete[] tmpRadarMap;
 	}
 
 	return radarMap;
@@ -932,10 +928,11 @@ const unsigned short* CAIAICallback::GetJammerMap() {
 
 	if (jammerMap == NULL) {
 		const int size = sAICallback->Map_getJammerMap(skirmishAIId, NULL, 0);
-		int tmpJammerMap[size];
+		int* tmpJammerMap = new int[size];
 		sAICallback->Map_getJammerMap(skirmishAIId, tmpJammerMap, size);
 		jammerMap = new unsigned short[size]; // NOTE: memory leak, but will be used till end of the game anyway
 		copyIntToUShortArray(tmpJammerMap, jammerMap, size);
+		delete[] tmpJammerMap;
 	}
 
 	return jammerMap;
@@ -947,10 +944,11 @@ const unsigned char* CAIAICallback::GetMetalMap() {
 
 	if (metalMap == NULL) {
 		const int size = sAICallback->Map_getResourceMapRaw(skirmishAIId, m, NULL, 0);
-		short tmpMetalMap[size];
+		short* tmpMetalMap = new short[size];
 		sAICallback->Map_getResourceMapRaw(skirmishAIId, m, tmpMetalMap, size);
 		metalMap = new unsigned char[size]; // NOTE: memory leak, but will be used till end of the game anyway
 		copyShortToUCharArray(tmpMetalMap, metalMap, size);
+		delete[] tmpMetalMap;
 	}
 
 	return metalMap;
@@ -1561,6 +1559,18 @@ const float3* CAIAICallback::GetStartPos() {
 	startPos = pos_cache;
 
 	return &startPos;
+}
+
+unsigned int CAIAICallback::GetCategoryFlag(const char* categoryName) {
+	return sAICallback->Game_getCategoryFlag(skirmishAIId, categoryName);
+}
+
+unsigned int CAIAICallback::GetCategoriesFlag(const char* categoryNames) {
+	return sAICallback->Game_getCategoriesFlag(skirmishAIId, categoryNames);
+}
+
+void CAIAICallback::GetCategoryName(int categoryFlag, char* name, int name_sizeMax) {
+	sAICallback->Game_getCategoryName(skirmishAIId, categoryFlag, name, name_sizeMax);
 }
 
 

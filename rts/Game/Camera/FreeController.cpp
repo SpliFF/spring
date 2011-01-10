@@ -1,23 +1,22 @@
 /* This file is part of the Spring engine (GPL v2 or later), see LICENSE.html */
 
 #include "StdAfx.h"
+#include <boost/cstdint.hpp>
 #include <SDL_keysym.h>
 
 #include "mmgr.h"
 
 #include "FreeController.h"
-
-#include "ConfigHandler.h"
 #include "Game/Camera.h"
-#include "LogOutput.h"
 #include "Map/Ground.h"
-#include "GlobalUnsynced.h"
 #include "Rendering/GlobalRendering.h"
-#include <boost/cstdint.hpp>
+#include "System/ConfigHandler.h"
+#include "System/GlobalUnsynced.h"
+#include "System/LogOutput.h"
+#include "System/Input/KeyInput.h"
 
 using std::max;
 using std::min;
-extern boost::uint8_t *keys;
 
 /******************************************************************************/
 /******************************************************************************/
@@ -116,7 +115,7 @@ void CFreeController::Update()
 	// adjustment to match the ground slope
 	float autoTiltVel = 0.0f;
 	if (gndLock && (autoTilt > 0.0f)) {
-		const float gndHeight = ground->GetHeight2(pos.x, pos.z);
+		const float gndHeight = ground->GetHeightReal(pos.x, pos.z);
 		if (pos.y < (gndHeight + gndOffset + 1.0f)) {
 			float3 hDir;
 			hDir.y = 0.0f;
@@ -157,7 +156,7 @@ void CFreeController::Update()
 		const float dGrav = (gravity * ft);
 		vel.y += dGrav;
 		if (slide > 0.0f) {
-			const float gndHeight = ground->GetHeight2(pos.x, pos.z);
+			const float gndHeight = ground->GetHeightReal(pos.x, pos.z);
 			if (pos.y < (gndHeight + gndOffset + 1.0f)) {
 				const float3 gndNormal = ground->GetSmoothNormal(pos.x, pos.z);
 				const float dotVal = gndNormal.y;
@@ -211,8 +210,9 @@ void CFreeController::Update()
 	}
 
 	// setup ground lock
-	const float gndHeight = ground->GetHeight2(pos.x, pos.z);
-	if (keys[SDLK_LSHIFT]) {
+	const float gndHeight = ground->GetHeightReal(pos.x, pos.z);
+
+	if (keyInput->IsKeyPressed(SDLK_LSHIFT)) {
 		if (ctrlVelY > 0.0f) {
 			gndLock = false;
 		} else if ((gndOffset > 0.0f) && (ctrlVelY < 0.0f) &&
@@ -269,13 +269,13 @@ void CFreeController::KeyMove(float3 move)
 	const float qy = (move.y == 0.0f) ? 0.0f : (move.y > 0.0f ? 1.0f : -1.0f);
 	const float qx = (move.x == 0.0f) ? 0.0f : (move.x > 0.0f ? 1.0f : -1.0f);
 
-	const float speed  = keys[SDLK_LMETA] ? 4.0f * scrollSpeed : scrollSpeed;
-	const float aspeed = keys[SDLK_LMETA] ? 2.0f * tiltSpeed   : tiltSpeed;
+	const float speed  = (keyInput->IsKeyPressed(SDLK_LMETA))? 4.0f * scrollSpeed : scrollSpeed;
+	const float aspeed = (keyInput->IsKeyPressed(SDLK_LMETA))? 2.0f * tiltSpeed   : tiltSpeed;
 
-	if (keys[SDLK_LCTRL]) {
+	if (keyInput->IsKeyPressed(SDLK_LCTRL)) {
 		avel.x += (aspeed * -qy); // tilt
 	}
-	else if (keys[SDLK_LSHIFT]) {
+	else if (keyInput->IsKeyPressed(SDLK_LSHIFT)) {
 		vel.y += (speed * -qy); // up/down
 	}
 	else {
@@ -285,7 +285,7 @@ void CFreeController::KeyMove(float3 move)
 	if (tracking) {
 		avel.y += (aspeed * qx); // turntable rotation
 	}
-	else if (!keys[SDLK_LALT] == invertAlt) {
+	else if (!keyInput->GetKeyState(SDLK_LALT) == invertAlt) {
 		vel.z += (speed * qx); // left/right
 	}
 	else {
@@ -298,51 +298,54 @@ void CFreeController::KeyMove(float3 move)
 
 void CFreeController::MouseMove(float3 move)
 {
-	boost::uint8_t prevAlt   = keys[SDLK_LALT];
-	boost::uint8_t prevCtrl  = keys[SDLK_LCTRL];
-	boost::uint8_t prevShift = keys[SDLK_LSHIFT];
+	const boost::uint8_t prevAlt   = keyInput->GetKeyState(SDLK_LALT);
+	const boost::uint8_t prevCtrl  = keyInput->GetKeyState(SDLK_LCTRL);
+	const boost::uint8_t prevShift = keyInput->GetKeyState(SDLK_LSHIFT);
 
-	keys[SDLK_LCTRL] = !keys[SDLK_LCTRL]; // tilt
-	keys[SDLK_LALT] = (invertAlt == !keys[SDLK_LALT]);
+	keyInput->SetKeyState(SDLK_LCTRL, !prevCtrl);
+	keyInput->SetKeyState(SDLK_LALT, (invertAlt == !prevAlt));
+
 	KeyMove(move);
 
-	keys[SDLK_LALT] = prevAlt;
-	keys[SDLK_LCTRL] = prevCtrl;
-	keys[SDLK_LSHIFT] = prevShift;
+	keyInput->SetKeyState(SDLK_LALT, prevAlt);
+	keyInput->SetKeyState(SDLK_LCTRL, prevCtrl);
+	keyInput->SetKeyState(SDLK_LSHIFT, prevShift);
 }
 
 
 void CFreeController::ScreenEdgeMove(float3 move)
 {
-	boost::uint8_t prevAlt   = keys[SDLK_LALT];
-	boost::uint8_t prevCtrl  = keys[SDLK_LCTRL];
-	boost::uint8_t prevShift = keys[SDLK_LSHIFT];
+	const boost::uint8_t prevAlt   = keyInput->GetKeyState(SDLK_LALT);
+	const boost::uint8_t prevCtrl  = keyInput->GetKeyState(SDLK_LCTRL);
+	const boost::uint8_t prevShift = keyInput->GetKeyState(SDLK_LSHIFT);
 
-	keys[SDLK_LALT] = (invertAlt == !keys[SDLK_LALT]);
+	keyInput->SetKeyState(SDLK_LALT, (invertAlt == !prevAlt));
 	KeyMove(move);
 
-	keys[SDLK_LALT] = prevAlt;
-	keys[SDLK_LCTRL] = prevCtrl;
-	keys[SDLK_LSHIFT] = prevShift;
+	keyInput->SetKeyState(SDLK_LALT, prevAlt);
+	keyInput->SetKeyState(SDLK_LCTRL, prevCtrl);
+	keyInput->SetKeyState(SDLK_LSHIFT, prevShift);
 }
 
 
 void CFreeController::MouseWheelMove(float move)
 {
-	boost::uint8_t prevCtrl  = keys[SDLK_LCTRL];
-	boost::uint8_t prevShift = keys[SDLK_LSHIFT];
-	keys[SDLK_LCTRL] = 0;
-	keys[SDLK_LSHIFT] = 1;
-	const float3 m(0.0f, move, 0.0f);
-	KeyMove(m);
-	keys[SDLK_LCTRL] = prevCtrl;
-	keys[SDLK_LSHIFT] = prevShift;
+	const boost::uint8_t prevCtrl  = keyInput->GetKeyState(SDLK_LCTRL);
+	const boost::uint8_t prevShift = keyInput->GetKeyState(SDLK_LSHIFT);
+
+	keyInput->SetKeyState(SDLK_LCTRL, 0);
+	keyInput->SetKeyState(SDLK_LSHIFT, 1);
+
+	KeyMove(float3(0.0f, move, 0.0f));
+
+	keyInput->SetKeyState(SDLK_LCTRL, prevCtrl);
+	keyInput->SetKeyState(SDLK_LSHIFT, prevShift);
 }
 
 
 void CFreeController::SetPos(const float3& newPos)
 {
-	const float h = ground->GetHeight2(newPos.x, newPos.z);
+	const float h = ground->GetHeightReal(newPos.x, newPos.z);
 	const float3 target = float3(newPos.x, h, newPos.z);
 //	const float3 target = newPos;
 	const float yDiff = pos.y - target.y;
@@ -356,7 +359,7 @@ void CFreeController::SetPos(const float3& newPos)
 	CCameraController::SetPos(newPos);
 	pos.y = oldPosY;
 	if (gndOffset != 0.0f) {
-		const float h = ground->GetHeight2(pos.x, pos.z);
+		const float h = ground->GetHeightReal(pos.x, pos.z);
 		const float absH = h + fabsf(gndOffset);
 		if (pos.y < absH) {
 			pos.y = absH;
@@ -388,7 +391,7 @@ float3 CFreeController::SwitchFrom() const
 {
 	const float x = max(0.1f, min(float3::maxxpos - 0.1f, pos.x));
 	const float z = max(0.1f, min(float3::maxzpos - 0.1f, pos.z));
-	return float3(x, ground->GetHeight(x, z) + 5.0f, z);
+	return float3(x, ground->GetHeightAboveWater(x, z) + 5.0f, z);
 }
 
 

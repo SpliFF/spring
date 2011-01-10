@@ -58,7 +58,7 @@ void CKAIK::InitAI(IGlobalAICallback* callback, int team) {
 	std::string verMsg =
 		std::string(AI_VERSION) + (ai->Initialized()? " initialized successfully!": " failed to initialize");
 	std::string logMsg =
-		ai->Initialized()? ("logging events to " + ai->logger->GetLogName()): "not logging events";
+		ai->Initialized()? ("logging events to " + ai->GetLogger()->GetLogName()): "not logging events";
 
 	ai->cb->SendTextMsg(verMsg.c_str(), 0);
 	ai->cb->SendTextMsg(logMsg.c_str(), 0);
@@ -197,8 +197,16 @@ void CKAIK::EnemyDamaged(int enemyUnitID, int attackerUnitID, float damage, floa
 	}
 }
 
-void CKAIK::EnemyCreated(int enemyUnitID) { ai->tm->EnemyCreated(enemyUnitID); }
-void CKAIK::EnemyFinished(int enemyUnitID) { ai->tm->EnemyFinished(enemyUnitID); }
+void CKAIK::EnemyCreated(int enemyUnitID) {
+	if (ai->Initialized()) {
+		ai->tm->EnemyCreated(enemyUnitID);
+	}
+}
+void CKAIK::EnemyFinished(int enemyUnitID) {
+	if (ai->Initialized()) {
+		ai->tm->EnemyFinished(enemyUnitID);
+	}
+}
 
 
 

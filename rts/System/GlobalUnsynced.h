@@ -21,8 +21,6 @@ class CGlobalUnsynced {
 	~CGlobalUnsynced();
 
 public:
-	void PostInit() {}
-
 	int    usRandInt();    //!< Unsynced random int
 	float  usRandFloat();  //!< Unsynced random float
 	float3 usRandVector(); //!< Unsynced random vector
@@ -125,6 +123,14 @@ public:
 	 * this player
 	 */
 	CUnit* directControl;
+
+	/**
+	* @brief global quit
+	*
+	* Global boolean indicating whether the user
+	* wants to quit
+	*/
+	volatile bool globalQuit;
 
 private:
 	/**

@@ -34,6 +34,7 @@
 #include "System/Exceptions.h"
 #include "System/NetProtocol.h"
 #include "System/TdfParser.h"
+#include "System/Input/KeyInput.h"
 #include "System/FileSystem/ArchiveScanner.h"
 #include "System/FileSystem/FileHandler.h"
 #include "System/FileSystem/FileSystem.h"
@@ -43,13 +44,12 @@
 #include "System/LoadSave/LoadSaveHandler.h"
 #include "System/Net/RawPacket.h"
 #include "System/Net/UnpackPacket.h"
+#include "System/Platform/errorhandler.h"
 
-CPreGame* pregame = NULL;
 using netcode::RawPacket;
 using std::string;
 
-extern boost::uint8_t* keys;
-extern volatile bool globalQuit;
+CPreGame* pregame = NULL;
 
 CPreGame::CPreGame(const ClientSetup* setup) :
 		settings(setup),
@@ -58,13 +58,10 @@ CPreGame::CPreGame(const ClientSetup* setup) :
 	net = new CNetProtocol();
 	activeController=this;
 
-	if(!settings->isHost)
-	{
-		net->InitClient(settings->hostip.c_str(), settings->hostport, settings->myPlayerName, settings->myPasswd, SpringVersion::GetFull());
+	if (!settings->isHost) {
+		net->InitClient(settings->hostIP.c_str(), settings->hostPort, settings->myPlayerName, settings->myPasswd, SpringVersion::GetFull());
 		timer = SDL_GetTicks();
-	}
-	else
-	{
+	} else {
 		net->InitLocalClient();
 	}
 }
@@ -102,10 +99,10 @@ void CPreGame::LoadSavefile(const std::string& save)
 
 int CPreGame::KeyPressed(unsigned short k,bool isRepeat)
 {
-	if (k == SDLK_ESCAPE){
-		if(keys[SDLK_LSHIFT]){
+	if (k == SDLK_ESCAPE) {
+		if (keyInput->IsKeyPressed(SDLK_LSHIFT)) {
 			logOutput.Print("User exited");
-			globalQuit=true;
+			gu->globalQuit = true;
 		} else
 			logOutput.Print("Use shift-esc to quit");
 	}
@@ -190,7 +187,7 @@ void CPreGame::StartServer(const std::string& setupscript)
 
 	good_fpu_control_registers("before CGameServer creation");
 	startupData->SetSetup(setup->gameSetupText);
-	gameServer = new CGameServer(settings->hostport, startupData, setup);
+	gameServer = new CGameServer(settings->hostIP, settings->hostPort, startupData, setup);
 	delete startupData;
 	gameServer->AddLocalClient(settings->myPlayerName, SpringVersion::GetFull());
 	good_fpu_control_registers("after CGameServer creation");
@@ -202,7 +199,7 @@ void CPreGame::UpdateClientNet()
 	if (net->CheckTimeout(0, true))
 	{
 		logOutput.Print("Server not reachable");
-		globalQuit = true;
+		gu->globalQuit = true;
 		return;
 	}
 
@@ -362,7 +359,7 @@ void CPreGame::ReadDataFromDemo(const std::string& demoName)
 			logOutput.Print("Starting GameServer");
 			good_fpu_control_registers("before CGameServer creation");
 
-			gameServer = new CGameServer(settings->hostport, data, tempSetup);
+			gameServer = new CGameServer(settings->hostIP, settings->hostPort, data, tempSetup);
 			gameServer->AddLocalClient(settings->myPlayerName, SpringVersion::GetFull());
 			delete data;
 

@@ -4,6 +4,7 @@
 #if defined(_MSC_VER) && (_MSC_VER >= 1310)
 #include <intrin.h>
 #endif
+#include <cstring>
 
 std::string StringReplace(const std::string& text,
                           const std::string& from,
@@ -46,6 +47,46 @@ std::string StringTrim(const std::string& str)
 	std::string copy(str);
 	StringTrimInPlace(copy);
 	return copy;
+}
+
+bool StringToBool(std::string str)
+{
+	bool value = true;
+
+	StringTrimInPlace(str);
+	StringToLowerInPlace(str);
+
+	// regex would probably be more appropriate,
+	// but it is better not to rely on any external lib here
+	if (
+			(str == "n")     ||
+			(str == "no")    ||
+			(str == "f")     ||
+			(str == "false") ||
+			(str == "0")
+		) {
+		value = false;
+	}
+
+	return value;
+}
+
+bool StringStartsWith(const std::string& str, const char* prefix)
+{
+	if ((prefix == NULL) || (str.size() < strlen(prefix))) {
+		return false;
+	} else {
+		return (str.compare(0, strlen(prefix), prefix) == 0);
+	}
+}
+
+bool StringEndsWith(const std::string& str, const char* postfix)
+{
+	if ((postfix == NULL) || (str.size() < strlen(postfix))) {
+		return false;
+	} else {
+		return (str.compare(str.size() - strlen(postfix), str.size(), postfix) == 0);
+	}
 }
 
 #if (!defined DEDICATED || defined _MSC_VER) && !defined UNITSYNC && !defined BUILDING_AI

@@ -1364,6 +1364,15 @@ int LuaSyncedCtrl::SetUnitArmored(lua_State* L)
 	if (lua_isboolean(L, 2)) {
 		unit->armoredState = lua_toboolean(L, 2);
 	}
+
+	// armored multiple of 0 will crash spring
+	unit->armoredMultiple = std::max(0.0001f, luaL_optfloat(L, 3, unit->armoredMultiple));
+
+	if (lua_toboolean(L, 2)) {
+		unit->curArmorMultiple = unit->armoredMultiple;
+	} else {
+		unit->curArmorMultiple = 1.0f;
+	}
 	return 0;
 }
 
@@ -1823,20 +1832,20 @@ int LuaSyncedCtrl::SetUnitPieceCollisionVolumeData(lua_State* L)
 	if (affectLocal) {
 		// affects this unit only
 		if (enableLocal) {
-			lmp->colvol->Init(scales, offset, vType, tType, pAxis);
-			lmp->colvol->Enable();
+			lmp->GetCollisionVolume()->Init(scales, offset, vType, tType, pAxis);
+			lmp->GetCollisionVolume()->Enable();
 		} else {
-			lmp->colvol->Disable();
+			lmp->GetCollisionVolume()->Disable();
 		}
 	}
 
 	if (affectGlobal) {
 		// affects all future units with this model
 		if (enableGlobal) {
-			omp->colvol->Init(scales, offset, vType, tType, pAxis);
-			omp->colvol->Enable();
+			omp->GetCollisionVolume()->Init(scales, offset, vType, tType, pAxis);
+			omp->GetCollisionVolume()->Enable();
 		} else {
-			omp->colvol->Disable();
+			omp->GetCollisionVolume()->Disable();
 		}
 	}
 
@@ -1973,9 +1982,9 @@ int LuaSyncedCtrl::SetUnitPosition(lua_State* L)
 	x = luaL_checkfloat(L, 2);
 	z = luaL_checkfloat(L, 3);
 	if (lua_isboolean(L, 4) && lua_toboolean(L, 4)) {
-		y = ground->GetHeight(x, z);
+		y = ground->GetHeightAboveWater(x, z);
 	} else {
-		y = ground->GetHeight2(x, z);
+		y = ground->GetHeightReal(x, z);
 	}
 	unit->ForcedMove(float3(x, y, z));
 
@@ -1989,27 +1998,29 @@ int LuaSyncedCtrl::SetUnitRotation(lua_State* L)
 	if (unit == NULL) {
 		return 0;
 	}
-	const float3 rot(luaL_checkfloat(L, 2),
-	                 luaL_checkfloat(L, 3),
-	                 luaL_checkfloat(L, 4));
+
+	const float3 rot(ClampRad(luaL_checkfloat(L, 2)),
+	                 ClampRad(luaL_checkfloat(L, 3)),
+	                 ClampRad(luaL_checkfloat(L, 4)));
+
 	CMatrix44f matrix;
 	matrix.RotateZ(rot.z);
 	matrix.RotateX(rot.x);
 	matrix.RotateY(rot.y);
-	unit->rightdir.x = matrix[ 0];
-	unit->rightdir.y = matrix[ 1];
-	unit->rightdir.z = matrix[ 2];
-	unit->updir.x    = matrix[ 4];
-	unit->updir.y    = matrix[ 5];
-	unit->updir.z    = matrix[ 6];
-	unit->frontdir.x = matrix[ 8];
-	unit->frontdir.y = matrix[ 9];
-	unit->frontdir.z = matrix[10];
 
-	const shortint2 HandP = GetHAndPFromVector(unit->frontdir);
-	unit->heading = HandP.x;
+	unit->rightdir.x = -matrix[ 0];
+	unit->rightdir.y = -matrix[ 1];
+	unit->rightdir.z = -matrix[ 2];
+	unit->updir.x    =  matrix[ 4];
+	unit->updir.y    =  matrix[ 5];
+	unit->updir.z    =  matrix[ 6];
+	unit->frontdir.x =  matrix[ 8];
+	unit->frontdir.y =  matrix[ 9];
+	unit->frontdir.z =  matrix[10];
 
+	unit->heading = GetHeadingFromVector(unit->frontdir.x, unit->frontdir.z);
 	unit->ForcedMove(unit->pos);
+
 	return 0;
 }
 
@@ -2558,13 +2569,13 @@ int LuaSyncedCtrl::SetProjectileCEG(lua_State* L)
 	if (proj->weapon) {
 		CWeaponProjectile* wproj = dynamic_cast<CWeaponProjectile*>(proj);
 		if (wproj != NULL) {
-			wproj->ceg.Load(explGenHandler, luaL_checkstring(L, 2));
+			wproj->cegID = gCEG->Load(explGenHandler, luaL_checkstring(L, 2));
 		}
 	}
 	if (proj->piece) {
 		CPieceProjectile* pproj = dynamic_cast<CPieceProjectile*>(proj);
 		if (pproj != NULL) {
-			pproj->ceg.Load(explGenHandler, luaL_checkstring(L, 2));
+			pproj->cegID = gCEG->Load(explGenHandler, luaL_checkstring(L, 2));
 		}
 	}
 
@@ -2803,8 +2814,8 @@ int LuaSyncedCtrl::GiveOrderArrayToUnitArray(lua_State* L)
 /******************************************************************************/
 /******************************************************************************/
 
-static void ParseMapParams(lua_State* L, const char* caller, float& factor,
-                           int& x1, int& z1, int& x2, int& z2)
+static void ParseParams(lua_State* L, const char* caller, float& factor,
+		int& x1, int& z1, int& x2, int& z2, int resolution, int maxX, int maxZ)
 {
 	float fx1 = 0.0f;
 	float fz1 = 0.0f;
@@ -2835,12 +2846,16 @@ static void ParseMapParams(lua_State* L, const char* caller, float& factor,
 	}
 
 	// quantize and clamp
-	x1 = (int)max(0 , min(gs->mapx, (int)(fx1 / SQUARE_SIZE)));
-	z1 = (int)max(0 , min(gs->mapy, (int)(fz1 / SQUARE_SIZE)));
-	x2 = (int)max(0 , min(gs->mapx, (int)(fx2 / SQUARE_SIZE)));
-	z2 = (int)max(0 , min(gs->mapy, (int)(fz2 / SQUARE_SIZE)));
+	x1 = (int)max(0 , min(maxX, (int)(fx1 / resolution)));
+	z1 = (int)max(0 , min(maxZ, (int)(fz1 / resolution)));
+	x2 = (int)max(0 , min(maxX, (int)(fx2 / resolution)));
+	z2 = (int)max(0 , min(maxZ, (int)(fz2 / resolution)));
+}
 
-	return;
+static inline void ParseMapParams(lua_State* L, const char* caller,
+		float& factor, int& x1, int& z1, int& x2, int& z2)
+{
+	ParseParams(L, caller, factor, x1, z1, x2, z2, SQUARE_SIZE, gs->mapx, gs->mapy);
 }
 
 
@@ -3052,44 +3067,12 @@ int LuaSyncedCtrl::SetHeightMapFunc(lua_State* L)
 /* smooth mesh manipulation                                                   */
 /******************************************************************************/
 
-static void ParseSmoothMeshParams(lua_State* L, const char* caller, float& factor,
-			   int& x1, int& z1, int& x2, int& z2)
+static inline void ParseSmoothMeshParams(lua_State* L, const char* caller,
+		float& factor, int& x1, int& z1, int& x2, int& z2)
 {
-	float fx1 = 0.0f;
-	float fz1 = 0.0f;
-	float fx2 = 0.0f;
-	float fz2 = 0.0f;
-
-	const int args = lua_gettop(L); // number of arguments
-	if (args == 3) {
-		fx1 = fx2 = luaL_checkfloat(L, 1);
-		fz1 = fz2 = luaL_checkfloat(L, 2);
-		factor    = luaL_checkfloat(L, 3);
-	}
-	else if (args == 5) {
-		fx1    = luaL_checkfloat(L, 1);
-		fz1    = luaL_checkfloat(L, 2);
-		fx2    = luaL_checkfloat(L, 3);
-		fz2    = luaL_checkfloat(L, 4);
-		factor = luaL_checkfloat(L, 5);
-		if (fx1 > fx2) {
-			swap(fx1, fx2);
-		}
-		if (fz1 > fz2) {
-			swap(fz1, fz2);
-		}
-	}
-	else {
-		luaL_error(L, "Incorrect arguments to %s()", caller);
-	}
-
-	// quantize and clamp
-	x1 = (int)max(0 , min(smoothGround->GetMaxX(), (int)(fx1 / smoothGround->GetResolution())));
-	z1 = (int)max(0 , min(smoothGround->GetMaxY(), (int)(fz1 / smoothGround->GetResolution())));
-	x2 = (int)max(0 , min(smoothGround->GetMaxX(), (int)(fx2 / smoothGround->GetResolution())));
-	z2 = (int)max(0 , min(smoothGround->GetMaxY(), (int)(fz2 / smoothGround->GetResolution())));
-
-	return;
+	ParseParams(L, caller, factor, x1, z1, x2, z2,
+			smoothGround->GetResolution(), smoothGround->GetMaxX(),
+			smoothGround->GetMaxY());
 }
 
 
@@ -3334,15 +3317,12 @@ int LuaSyncedCtrl::SpawnCEG(lua_State* L)
 	const float rad = luaL_optfloat(L, 8, 0.0f);
 	const float dmg = luaL_optfloat(L, 9, 0.0f);
 	const float dmgMod = 1.0f;
-	if (name.empty()) {
-		return 0;
-	}
 
-	CCustomExplosionGenerator g;
-	g.Load(explGenHandler, name);
-	g.Explosion(pos, dmg, rad, 0x0, dmgMod, 0x0, dir);
+	const unsigned int cegID = gCEG->Load(explGenHandler, name);
+	const bool ret = gCEG->Explosion(cegID, pos, dmg, rad, NULL, dmgMod, NULL, dir);
 
-	return 0;
+	lua_pushboolean(L, ret);
+	return 1;
 }
 
 /******************************************************************************/

@@ -16,7 +16,7 @@ class CSolidObject;
 class CBuilder : public CUnit
 {
 private:
-	void UnitInit (const UnitDef* def, int team, const float3& position);
+	void PreInit(const UnitDef* def, int team, int facing, const float3& position, bool build);
 
 public:
 	inline float f3Dist(const float3& a, const float3& b) const {
@@ -44,7 +44,7 @@ public:
 	void DependentDied(CObject* o);
 	virtual void DeleteDeathDependence(CObject* o, DependenceType dep);
 
-	bool StartBuild(BuildInfo& buildInfo, CFeature*& feature);
+	bool StartBuild(BuildInfo& buildInfo, CFeature*& feature, bool& waitstance);
 	float CalculateBuildTerraformCost(BuildInfo& buildInfo);
 	void StopBuild(bool callScript = true);
 	void SetRepairTarget(CUnit* target);

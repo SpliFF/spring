@@ -2412,7 +2412,8 @@ int LuaSyncedRead::GetUnitArmored(lua_State* L)
 		return 0;
 	}
 	lua_pushboolean(L, unit->armoredState);
-	return 1;
+	lua_pushnumber(L, unit->armoredMultiple);
+	return 2;
 }
 
 
@@ -3180,7 +3181,7 @@ int LuaSyncedRead::GetUnitPieceCollisionVolumeData(lua_State* L)
 	}
 
 	const LocalModelPiece* lmp = lm->pieces[pieceIndex];
-	const CollisionVolume* vol = lmp->colvol;
+	const CollisionVolume* vol = lmp->GetCollisionVolume();
 
 	lua_pushnumber(L, vol->GetScales().x);
 	lua_pushnumber(L, vol->GetScales().y);
@@ -3343,10 +3344,9 @@ int LuaSyncedRead::GetUnitMoveTypeData(lua_State *L)
 		HSTR_PUSH_NUMBER(L, "nextwaypointz", groundmt->nextWaypoint.z);
 
 		HSTR_PUSH_NUMBER(L, "requestedSpeed", groundmt->requestedSpeed);
-		HSTR_PUSH_NUMBER(L, "requestedTurnRate", groundmt->requestedTurnRate);
 
 		HSTR_PUSH_NUMBER(L, "pathFailures", 0);
-		HSTR_PUSH_NUMBER(L, "floatOnWater", groundmt->floatOnWater);
+		HSTR_PUSH_NUMBER(L, "floatOnWater", unit->floatOnWater);
 
 		return 1;
 	}
@@ -4375,8 +4375,7 @@ int LuaSyncedRead::GetGroundHeight(lua_State* L)
 {
 	const float x = luaL_checkfloat(L, 1);
 	const float z = luaL_checkfloat(L, 2);
-	// GetHeight2() does not clamp the value to (>= 0)
-	lua_pushnumber(L, ground->GetHeight2(x, z));
+	lua_pushnumber(L, ground->GetHeightReal(x, z));
 	return 1;
 }
 
@@ -4751,7 +4750,7 @@ int LuaSyncedRead::GetUnitPieceMap(lua_State* L)
 	lua_newtable(L);
 	for (size_t i = 0; i < localModel->pieces.size(); i++) {
 		const LocalModelPiece& lp = *localModel->pieces[i];
-		lua_pushstring(L, lp.name.c_str());
+		lua_pushstring(L, lp.original->name.c_str());
 		lua_pushnumber(L, i + 1);
 		lua_rawset(L, -3);
 	}
@@ -4770,7 +4769,7 @@ int LuaSyncedRead::GetUnitPieceList(lua_State* L)
 	for (size_t i = 0; i < localModel->pieces.size(); i++) {
 		const LocalModelPiece& lp = *localModel->pieces[i];
 		lua_pushnumber(L, i + 1);
-		lua_pushstring(L, lp.name.c_str());
+		lua_pushstring(L, lp.original->name.c_str());
 		lua_rawset(L, -3);
 	}
 	HSTR_PUSH_NUMBER(L, "n", localModel->pieces.size());
@@ -4987,7 +4986,7 @@ int LuaSyncedRead::GetUnitScriptNames(lua_State* L)
 
 	lua_newtable(L);
 	for (size_t sp = 0; sp < pieces.size(); sp++) {
-		lua_pushstring(L, pieces[sp]->name.c_str());
+		lua_pushstring(L, pieces[sp]->original->name.c_str());
 		lua_pushnumber(L, sp);
 		lua_rawset(L, -3);
 	}

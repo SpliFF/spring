@@ -315,7 +315,7 @@ void CBuilderCAI::GiveCommandReal(const Command& c, bool fromSynced)
 		bi.pos = float3(c.params[0], c.params[1], c.params[2]);
 
 		if (c.params.size() == 4)
-			bi.buildFacing = int(abs(c.params[3])) % 4;
+			bi.buildFacing = int(abs(c.params[3])) % NUM_FACINGS;
 
 		bi.def = unitDefHandler->GetUnitDefByName(boi->second);
 		bi.pos = helper->Pos2BuildPos(bi);
@@ -430,21 +430,22 @@ void CBuilderCAI::SlowUpdate()
 							buildRetries++;
 							owner->moveType->KeepPointingTo(build.pos, builder->buildDistance * 0.7f + radius, false);
 
-							if (builder->StartBuild(build, f) || (buildRetries > 20)) {
+							bool waitstance = false;
+							if (builder->StartBuild(build, f, waitstance) || (buildRetries > 20)) {
 								building = true;
 							}
 							else if (f) {
 								inCommand = false;
 								ReclaimFeature(f);
 							}
-							else {
+							else if (!waitstance) {
 								const float fpSqRadius = (ud->xsize * ud->xsize + ud->zsize * ud->zsize);
 								const float fpRadius = (math::sqrt(fpSqRadius) * 0.5f) * SQUARE_SIZE;
 
 								// tell everything within the radius of the soon-to-be buildee
 								// to get out of the way; using the model radius is not correct
 								// because this can be shorter than half the footprint diagonal
-								helper->BuggerOff(build.pos, std::max(radius, fpRadius), false, true, NULL);
+								helper->BuggerOff(build.pos, std::max(radius, fpRadius), false, true, owner->team, NULL);
 								NonMoving();
 							}
 						}
@@ -466,7 +467,7 @@ void CBuilderCAI::SlowUpdate()
 			bi.pos.y = c.params[1];
 
 			if (c.params.size() == 4)
-				bi.buildFacing = int(abs(c.params[3])) % 4;
+				bi.buildFacing = int(abs(c.params[3])) % NUM_FACINGS;
 
 			bi.def = unitDefHandler->GetUnitDefByName(boi->second);
 
@@ -552,7 +553,7 @@ void CBuilderCAI::ExecuteRepair(Command& c)
 			return;
 		}
 
-		if (tempOrder && owner->moveState == 1) {
+		if (tempOrder && owner->moveState == MOVESTATE_MANEUVER) {
 			// limit how far away we go
 			if (LinePointDist(commandPos1, commandPos2, unit->pos) > 500) {
 				StopMove();
@@ -1117,7 +1118,7 @@ void CBuilderCAI::ExecuteRestore(Command& c)
 		}
 	} else if (owner->unitDef->canRestore) {
 		float3 pos(c.params[0], c.params[1], c.params[2]);
-			pos.y = ground->GetHeight2(pos.x, pos.y);
+			pos.y = ground->GetHeightReal(pos.x, pos.y);
 		const float radius = std::min(c.params[3], 200.0f);
 
 		if (f3SqDist(builder->pos, pos) < Square(builder->buildDistance - 1)) {
@@ -1539,11 +1540,11 @@ bool CBuilderCAI::FindRepairTargetAndRepair(const float3& pos, float radius,
 		if (teamHandler->Ally(owner->allyteam, unit->allyteam)) {
 			if (!haveEnemy && (unit->health < unit->maxHealth)) {
 				// don't help allies build unless set on roam
-				if (unit->beingBuilt && owner->team != unit->team && (owner->moveState != 2)) {
+				if (unit->beingBuilt && owner->team != unit->team && (owner->moveState != MOVESTATE_ROAM)) {
 					continue;
 				}                
 				// don't help factories produce units when set on hold pos                
-				if (unit->beingBuilt && unit->mobility && (owner->moveState == 0)) {
+				if (unit->beingBuilt && unit->mobility && (owner->moveState == MOVESTATE_HOLDPOS)) {
 					continue;
 				}
 				// don't repair stuff that can't be repaired
@@ -1663,7 +1664,7 @@ void CBuilderCAI::DrawCommands(void)
 				bi.def = unitDefHandler->GetUnitDefByID(-(ci->id));
 
 				if (ci->params.size() == 4) {
-					bi.buildFacing = int(abs(ci->params[3])) % 4;
+					bi.buildFacing = int(abs(ci->params[3])) % NUM_FACINGS;
 				}
 
 				bi.pos = float3(ci->params[0], ci->params[1], ci->params[2]);

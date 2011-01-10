@@ -26,35 +26,27 @@
 CR_BIND_DERIVED(CTransportUnit, CUnit, );
 
 CR_REG_METADATA(CTransportUnit, (
-				CR_MEMBER(transported),
-				CR_MEMBER(transportCapacityUsed),
-				CR_MEMBER(transportMassUsed),
-				CR_RESERVED(16),
-				CR_POSTLOAD(PostLoad)
-				));
+	CR_MEMBER(transported),
+	CR_MEMBER(transportCapacityUsed),
+	CR_MEMBER(transportMassUsed),
+	CR_RESERVED(16),
+	CR_POSTLOAD(PostLoad)
+));
 
 CR_BIND(CTransportUnit::TransportedUnit,);
 
 CR_REG_METADATA_SUB(CTransportUnit,TransportedUnit,(
-					CR_MEMBER(unit),
-					CR_MEMBER(piece),
-					CR_MEMBER(size),
-					CR_MEMBER(mass),
-					CR_RESERVED(8)
-					));
+	CR_MEMBER(unit),
+	CR_MEMBER(piece),
+	CR_MEMBER(size),
+	CR_MEMBER(mass),
+	CR_RESERVED(8)
+));
 
 CTransportUnit::CTransportUnit(): transportCapacityUsed(0), transportMassUsed(0)
 {
 }
 
-
-CTransportUnit::~CTransportUnit()
-{
-}
-
-void CTransportUnit::PostLoad()
-{
-}
 
 void CTransportUnit::Update()
 {
@@ -128,7 +120,7 @@ void CTransportUnit::KillUnit(bool selfDestruct, bool reclaimed, CUnit* attacker
 	std::list<TransportedUnit>::iterator ti;
 	for (ti = transported.begin(); ti != transported.end(); ++ti) {
 		CUnit* u = ti->unit;
-		const float gh = ground->GetHeight2(u->pos.x, u->pos.z);
+		const float gh = ground->GetHeightReal(u->pos.x, u->pos.z);
 
 		u->transporter = 0;
 		u->DeleteDeathDependence(this, DEPENDENCE_TRANSPORTER);
@@ -142,7 +134,7 @@ void CTransportUnit::KillUnit(bool selfDestruct, bool reclaimed, CUnit* attacker
 		} else {
 			// immobile units can still be transported
 			// via script trickery, guard against this
-			if(!u->unitDef->IsTerrainHeightOK(gh)) {
+			if (!u->unitDef->IsAllowedTerrainHeight(gh)) {
 				u->KillUnit(false, false, NULL, false);
 				continue;
 			}
@@ -163,11 +155,11 @@ void CTransportUnit::KillUnit(bool selfDestruct, bool reclaimed, CUnit* attacker
 				const float k = (u->radius + radius)*std::max(unitDef->unloadSpread, 1.f);
 				// try to unload in a presently unoccupied spot
 				// unload on a wreck if suitable position not found
-				for (int i = 0; i<10; ++i) {
+				for (int i = 0; i < 10; ++i) {
 					float3 pos = u->pos;
 					pos.x += gs->randFloat()*2*k - k;
 					pos.z += gs->randFloat()*2*k - k;
-					pos.y = ground->GetHeight2(u->pos.x, u->pos.z);
+					pos.y = ground->GetHeightReal(u->pos.x, u->pos.z);
 					if (qf->GetUnitsExact(pos, u->radius + 2).empty()) {
 						u->pos = pos;
 						break;
@@ -178,11 +170,8 @@ void CTransportUnit::KillUnit(bool selfDestruct, bool reclaimed, CUnit* attacker
 				mt->StartFlying();
 			}
 
-			u->stunned = (u->paralyzeDamage > (modInfo.paralyzeOnMaxHealth? u->maxHealth: u->health));
-			loshandler->MoveUnit(u, false);
-			qf->MovedUnit(u);
-			radarhandler->MoveUnit(u);
-			u->moveType->LeaveTransport();
+			((AMoveType*) u->moveType)->SlowUpdate();
+			(             u->moveType)->LeaveTransport();
 
 			// issue a move order so that unit won't try to return to pick-up pos in IdleCheck()
 			if (dynamic_cast<CTAAirMoveType*>(moveType) && u->unitDef->canmove) {
@@ -190,11 +179,12 @@ void CTransportUnit::KillUnit(bool selfDestruct, bool reclaimed, CUnit* attacker
 				Command c;
 				c.id = CMD_MOVE;
 				c.params.push_back(pos.x);
-				c.params.push_back(ground->GetHeight(pos.x, pos.z));
+				c.params.push_back(ground->GetHeightAboveWater(pos.x, pos.z));
 				c.params.push_back(pos.z);
 				u->commandAI->GiveCommand(c);
 			}
 
+			u->stunned = (u->paralyzeDamage > (modInfo.paralyzeOnMaxHealth? u->maxHealth: u->health));
 			u->speed = speed * (0.5f + 0.5f * gs->randFloat());
 
 			if (CBuilding* building = dynamic_cast<CBuilding*>(u)) {
@@ -331,9 +321,8 @@ bool CTransportUnit::DetachUnitCore(CUnit* unit)
 			// de-stun in case it isFirePlatform=0
 			unit->stunned = (unit->paralyzeDamage > (modInfo.paralyzeOnMaxHealth? unit->maxHealth: unit->health));
 
-			loshandler->MoveUnit(unit, false);
-			qf->MovedUnit(unit);
-			radarhandler->MoveUnit(unit);
+			((AMoveType*) unit->moveType)->SlowUpdate();
+			(             unit->moveType)->LeaveTransport();
 
 			if (CBuilding* building = dynamic_cast<CBuilding*>(unit))
 				building->ForcedMove(building->pos, building->buildFacing);
@@ -341,8 +330,6 @@ bool CTransportUnit::DetachUnitCore(CUnit* unit)
 			transportCapacityUsed -= ti->size;
 			transportMassUsed -= ti->mass;
 			transported.erase(ti);
-
-			unit->moveType->LeaveTransport();
 
 			unit->CalculateTerrainType();
 			unit->UpdateTerrainType();
@@ -389,59 +376,83 @@ void CTransportUnit::DetachUnitFromAir(CUnit* unit, float3 pos)
 	}
 }
 
-bool CTransportUnit::CanLoadUnloadAtPos(const float3& wantedPos, const CUnit *unit) const {
-	bool isok;
-	float loadAlt = GetLoadUnloadHeight(wantedPos, unit, &isok);
-	if(dynamic_cast<CTAAirMoveType*>(moveType) && unit->transporter && 
-		!unitDef->canSubmerge && loadAlt < 5.0f) // dont drop it so deep that we cannot pick it up again
-		return false;
-	return isok;
+
+
+bool CTransportUnit::CanLoadUnloadAtPos(const float3& wantedPos, const CUnit* unit) const {
+	bool canLoadUnload = false;
+	float loadHeight = GetLoadUnloadHeight(wantedPos, unit, &canLoadUnload);
+
+	// for a given unit, we can *potentially* load/unload it at <wantedPos> if
+	//     we are not a gunship-style transport, or
+	//     the unit is not already in a transport, or
+	//     we can land underwater, or
+	//     the target-altitude is over dry land
+	if (dynamic_cast<CTAAirMoveType*>(moveType) == NULL) { return canLoadUnload; }
+	if (unit->transporter == NULL) { return canLoadUnload; }
+	if (unitDef->canSubmerge) { return canLoadUnload; }
+	if (loadHeight >= 5.0f) { return canLoadUnload; }
+
+	return false;
 }
 
-float CTransportUnit::GetLoadUnloadHeight(const float3& wantedPos, const CUnit *unit, bool *ok) const {
-	float wantedYpos = unit->pos.y;
-	float adjustedYpos = wantedYpos;
-	bool isok = true;
-	if(unit->transporter) { // return unloading altitude
-		wantedYpos = ground->GetHeight2(wantedPos.x, wantedPos.z);
-		if(unit->unitDef->floater) {
-			if(unit->unitDef->GetAllowedTerrainHeight(wantedYpos) != wantedYpos)
-				isok = false;
-			wantedYpos = std::max(-unit->unitDef->waterline, wantedYpos);
-			adjustedYpos = wantedYpos;
+float CTransportUnit::GetLoadUnloadHeight(const float3& wantedPos, const CUnit* unit, bool* allowedPos) const {
+	bool isAllowedHeight = true;
+
+	float wantedHeight = unit->pos.y;
+	float clampedHeight = wantedHeight;
+
+	if (unit->transporter != NULL) {
+		// unit is being transported, set <clampedHeight> to
+		// the altitude at which to unload the transportee
+		wantedHeight = ground->GetHeightReal(wantedPos.x, wantedPos.z);
+		isAllowedHeight = unit->unitDef->IsAllowedTerrainHeight(wantedHeight, &clampedHeight);
+
+		if (isAllowedHeight) {
+			if (unit->unitDef->floater) {
+				wantedHeight = std::max(-unit->unitDef->waterline, wantedHeight);
+				clampedHeight = wantedHeight;
+			} else if (unit->unitDef->canhover) {
+				wantedHeight = std::max(0.0f, wantedHeight);
+				clampedHeight = wantedHeight;
+			}
 		}
-		else if(unit->unitDef->canhover) {
-			wantedYpos = std::max(0.0f, wantedYpos);
-			adjustedYpos = wantedYpos;
-		}
-		else
-			adjustedYpos = unit->unitDef->GetAllowedTerrainHeight(wantedYpos);
-		if(dynamic_cast<const CBuilding *>(unit)) {
+
+		if (dynamic_cast<const CBuilding*>(unit) != NULL) {
+			// for transported structures, <wantedPos> must be free/buildable
+			// (note: TestUnitBuildSquare calls IsAllowedTerrainHeight again)
 			BuildInfo bi(unit->unitDef, wantedPos, unit->buildFacing);
 			bi.pos = helper->Pos2BuildPos(bi);
-			CFeature *f;
-			if(!uh->TestUnitBuildSquare(bi, f, -1) || f)
-				isok = false;
+			CFeature* f = NULL;
+
+			if (isAllowedHeight && (!uh->TestUnitBuildSquare(bi, f, -1) || f != NULL))
+				isAllowedHeight = false;
 		}
 	}
 
-	float terrainHeight = adjustedYpos + unit->model->height;
-	float adjustedTerrainHeight = terrainHeight;
-	if(dynamic_cast<CTAAirMoveType*>(moveType)) // check if transport can reach the loading altitude
-		adjustedTerrainHeight = unitDef->GetAllowedTerrainHeight(terrainHeight);
-	if(ok)
-		*ok = isok && (adjustedTerrainHeight == terrainHeight) && (adjustedYpos == wantedYpos);
-	return adjustedTerrainHeight;
+
+	float contactHeight = clampedHeight + unit->model->height;
+	float finalHeight = contactHeight;
+
+	if (dynamic_cast<CTAAirMoveType*>(moveType) != NULL) {
+		// if we are a gunship-style transport, we must be
+		// capable of reaching the point-of-contact height
+		isAllowedHeight = unitDef->IsAllowedTerrainHeight(contactHeight, &finalHeight);
+	}
+
+	if (allowedPos) {
+		*allowedPos = isAllowedHeight;
+	}
+
+	return finalHeight;
 }
 
 
-float CTransportUnit::GetLoadUnloadHeading(const float3& wantedPos, const CUnit *unit) const {
-	if(dynamic_cast<CTAAirMoveType*>(moveType)) {
-		if(unit->transporter) { // return unloading heading
-			if(dynamic_cast<const CBuilding *>(unit))
-				return GetHeadingFromFacing(unit->buildFacing);
-			return unit->heading;
-		}
-	}
-	return unit->heading;
+
+float CTransportUnit::GetLoadUnloadHeading(const CUnit* unit) const {
+	if (unit->transporter == NULL) { return unit->heading; }
+	if (dynamic_cast<CTAAirMoveType*>(moveType) == NULL) { return unit->heading; }
+	if (dynamic_cast<const CBuilding*>(unit) == NULL) { return unit->heading; }
+
+	// transported structures want to face a cardinal direction
+	return (GetHeadingFromFacing(unit->buildFacing));
 }

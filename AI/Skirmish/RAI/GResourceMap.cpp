@@ -1,9 +1,8 @@
 #include "GResourceMap.h"
 #include "RAI.h"
 #include <set>
-#include "Sim/Features/FeatureDef.h"
+#include "LegacyCpp/FeatureDef.h"
 #include "System/Util.h"
-//#include <time.h>
 #include <stdio.h>
 
 // a metal map block is 0-255 * cb->GetMaxMetal(), extractors are normally built on several
@@ -104,7 +103,6 @@ GlobalResourceMap::GlobalResourceMap(IAICallback* _cb, cLogFile* l, GlobalTerrai
 	relResourceFileName = "cache/" + cRAI::MakeFileSystemCompatible(cb->GetModHumanName());
 	relResourceFileName += "-" + IntToString(cb->GetModHash(), "%x");
 	relResourceFileName += "-" + cRAI::MakeFileSystemCompatible(cb->GetMapName());
-	relResourceFileName.resize(relResourceFileName.size() - 4); // cut off extension
 	relResourceFileName += "-" + IntToString(cb->GetMapHash(), "%x");
 	relResourceFileName += ".res";
 
@@ -445,7 +443,7 @@ GlobalResourceMap::GlobalResourceMap(IAICallback* _cb, cLogFile* l, GlobalTerrai
 						break;
 					}
 
-			// Initailizing MMS(.metal .assessing .x .z)
+			// Initializing MMS(.metal .assessing .x .z)
 			int SMindex;	// temp variable
 			float percentMetal = 0.0;
 			const unsigned char *StandardMetalMap = cb->GetMetalMap();

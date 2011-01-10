@@ -49,7 +49,7 @@ CGameHelper* helper;
 
 CGameHelper::CGameHelper()
 {
-	stdExplosionGenerator = new CStdExplosionGenerator;
+	stdExplosionGenerator = new CStdExplosionGenerator();
 }
 
 CGameHelper::~CGameHelper()
@@ -94,7 +94,7 @@ void CGameHelper::DoExplosionDamage(CUnit* unit,
 	float3 diffPos;
 
 	if (piece != NULL && unit->unitDef->usePieceCollisionVolumes && damageFrame == gs->frameNum) {
-		volume = piece->colvol;
+		volume = piece->GetCollisionVolume();
 		basePos = piece->GetPos() + volume->GetOffsets();
 		basePos = unit->pos + 
 			unit->rightdir * basePos.x +
@@ -199,7 +199,7 @@ void CGameHelper::Explosion(
 	float expSpeed, CUnit* owner,
 	bool damageGround, float gfxMod,
 	bool ignoreOwner, bool impactOnly,
-	CExplosionGenerator* explosionGraphics,
+	IExplosionGenerator* explosionGenerator,
 	CUnit* hitUnit,
 	const float3& impactDir, int weaponId,
 	CFeature* hitFeature
@@ -219,7 +219,7 @@ void CGameHelper::Explosion(
 	tracefile << expPos.x << " " << damages[0] <<  " " << expRad << "\n";
 #endif
 
-	const float h2 = ground->GetHeight2(expPos.x, expPos.z);
+	const float h2 = ground->GetHeightReal(expPos.x, expPos.z);
 
 	expPos.y = std::max(expPos.y, h2);
 	expRad = std::max(expRad, 1.0f);
@@ -288,10 +288,10 @@ void CGameHelper::Explosion(
 
 	// use CStdExplosionGenerator by default
 	if (!noGfx) {
-		if (!explosionGraphics) {
-			explosionGraphics = stdExplosionGenerator;
+		if (explosionGenerator == NULL) {
+			explosionGenerator = stdExplosionGenerator;
 		}
-		explosionGraphics->Explosion(expPos, damages[0], expRad, owner, gfxMod, hitUnit, impactDir);
+		explosionGenerator->Explosion(0, expPos, damages[0], expRad, owner, gfxMod, hitUnit, impactDir);
 	}
 
 	groundDecals->AddExplosion(expPos, damages[0], expRad);
@@ -1108,24 +1108,21 @@ float3 CGameHelper::GetUnitErrorPos(const CUnit* unit, int allyteam)
 }
 
 
-void CGameHelper::BuggerOff(float3 pos, float radius, bool spherical, bool forced, CUnit* excludeUnit)
+void CGameHelper::BuggerOff(float3 pos, float radius, bool spherical, bool forced, int teamId, CUnit* excludeUnit)
 {
 	const std::vector<CUnit*> &units = qf->GetUnitsExact(pos, radius + SQUARE_SIZE, spherical);
+	const int allyTeamId = teamHandler->AllyTeam(teamId);
 
 	for (std::vector<CUnit*>::const_iterator ui = units.begin(); ui != units.end(); ++ui) {
 		CUnit* u = *ui;
 
 		// don't send BuggerOff commands to enemy units
-		bool allied = true;
+		const int uAllyTeamId = u->allyteam;
+		const bool allied = (
+				teamHandler->Ally(uAllyTeamId,  allyTeamId) ||
+				teamHandler->Ally(allyTeamId, uAllyTeamId));
 
-		if (excludeUnit) {
-			const int eAllyTeam = excludeUnit->allyteam;
-			const int uAllyTeam = u->allyteam;
-
-			allied = (teamHandler->Ally(uAllyTeam, eAllyTeam) || teamHandler->Ally(eAllyTeam, uAllyTeam));
-		}
-
-		if (u != excludeUnit && allied && ((!u->unitDef->pushResistant && !u->usingScriptMoveType) || forced)) {
+		if ((u != excludeUnit) && allied && ((!u->unitDef->pushResistant && !u->usingScriptMoveType) || forced)) {
 			u->commandAI->BuggerOff(pos, radius + SQUARE_SIZE);
 		}
 	}
@@ -1279,55 +1276,48 @@ void CGameHelper::Update(void)
 
 /** @return true if there is an allied unit within
     the firing cone of <owner> (that might be hit) */
-bool CGameHelper::TestAllyCone(const float3& from, const float3& weaponDir, float length, float spread, int allyteam, CUnit* owner)
+bool CGameHelper::TestCone(
+	const float3& from,
+	const float3& weaponDir,
+	float length,
+	float spread,
+	const CUnit* owner,
+	unsigned int flags)
 {
-	int quads[1000];
+	int quads[1024];
 	int* endQuad = quads;
+
 	qf->GetQuadsOnRay(from, weaponDir, length, endQuad);
 
 	for (int* qi = quads; qi != endQuad; ++qi) {
 		const CQuadField::Quad& quad = qf->GetQuad(*qi);
-		for (std::list<CUnit*>::const_iterator ui = quad.teamUnits[allyteam].begin(); ui != quad.teamUnits[allyteam].end(); ++ui) {
-			CUnit* u = *ui;
+
+		const std::list<CUnit*>& units =
+			((flags & TEST_ALLIED) != 0)?
+			quad.teamUnits[owner->allyteam]:
+			quad.units;
+
+		for (std::list<CUnit*>::const_iterator ui = units.begin(); ui != units.end(); ++ui) {
+			const CUnit* u = *ui;
 
 			if (u == owner)
+				continue;
+
+			if ((flags & TEST_NEUTRAL) != 0 && !u->IsNeutral())
 				continue;
 
 			if (TestConeHelper(from, weaponDir, length, spread, u))
 				return true;
 		}
 	}
+
 	return false;
 }
 
-/** same as TestAllyCone, but looks for neutral units */
-bool CGameHelper::TestNeutralCone(const float3& from, const float3& weaponDir, float length, float spread, CUnit* owner)
-{
-	int quads[1000];
-	int* endQuad = quads;
-	qf->GetQuadsOnRay(from, weaponDir, length, endQuad);
-
-	for (int* qi = quads; qi != endQuad; ++qi) {
-		const CQuadField::Quad& quad = qf->GetQuad(*qi);
-
-		for (std::list<CUnit*>::const_iterator ui = quad.units.begin(); ui != quad.units.end(); ++ui) {
-			CUnit* u = *ui;
-
-			if (u == owner)
-				continue;
-
-			if (u->IsNeutral()) {
-				if (TestConeHelper(from, weaponDir, length, spread, u))
-					return true;
-			}
-		}
-	}
-	return false;
-}
-
-
-/** helper for TestAllyCone and TestNeutralCone
-    @return true if the unit u is in the firing cone, false otherwise */
+/**
+    helper for TestCone
+    @return true if the unit u is in the firing cone
+*/
 bool CGameHelper::TestConeHelper(const float3& from, const float3& weaponDir, float length, float spread, const CUnit* u)
 {
 	// account for any offset, since we want to know if our shots might hit
@@ -1352,56 +1342,53 @@ bool CGameHelper::TestConeHelper(const float3& from, const float3& weaponDir, fl
 
 
 
-/** @return true if there is an allied unit within
+/** @return true if there is an allied or neutral unit within
     the firing trajectory of <owner> (that might be hit) */
-bool CGameHelper::TestTrajectoryAllyCone(const float3& from, const float3& flatdir, float length, float linear, float quadratic, float spread, float baseSize, int allyteam, CUnit* owner)
+bool CGameHelper::TestTrajectoryCone(
+	const float3& from,
+	const float3& flatdir,
+	float length,
+	float linear,
+	float quadratic,
+	float spread,
+	float baseSize,
+	const CUnit* owner,
+	unsigned int flags)
 {
-	int quads[1000];
+	int quads[1024];
 	int* endQuad = quads;
+
 	qf->GetQuadsOnRay(from, flatdir, length, endQuad);
 
 	for (int* qi = quads; qi != endQuad; ++qi) {
 		const CQuadField::Quad& quad = qf->GetQuad(*qi);
-		for (std::list<CUnit*>::const_iterator ui = quad.teamUnits[allyteam].begin(); ui != quad.teamUnits[allyteam].end(); ++ui) {
-			CUnit* u = *ui;
+
+		const std::list<CUnit*>& units =
+			((flags & TEST_ALLIED) != 0)?
+			quad.teamUnits[owner->allyteam]:
+			quad.units;
+
+		for (std::list<CUnit*>::const_iterator ui = units.begin(); ui != units.end(); ++ui) {
+			const CUnit* u = *ui;
 
 			if (u == owner)
+				continue;
+
+			if ((flags & TEST_NEUTRAL) != 0 && !u->IsNeutral())
 				continue;
 
 			if (TestTrajectoryConeHelper(from, flatdir, length, linear, quadratic, spread, baseSize, u))
 				return true;
 		}
 	}
+
 	return false;
 }
 
-/** same as TestTrajectoryAllyCone, but looks for neutral units */
-bool CGameHelper::TestTrajectoryNeutralCone(const float3& from, const float3& flatdir, float length, float linear, float quadratic, float spread, float baseSize, CUnit* owner)
-{
-	int quads[1000];
-	int* endQuad = quads;
-	qf->GetQuadsOnRay(from, flatdir, length, endQuad);
-
-	for (int* qi = quads; qi != endQuad; ++qi) {
-		const CQuadField::Quad& quad = qf->GetQuad(*qi);
-		for (std::list<CUnit*>::const_iterator ui = quad.units.begin(); ui != quad.units.end(); ++ui) {
-			CUnit* u = *ui;
-
-			if (u == owner)
-				continue;
-
-			if (u->IsNeutral()) {
-				if (TestTrajectoryConeHelper(from, flatdir, length, linear, quadratic, spread, baseSize, u))
-					return true;
-			}
-		}
-	}
-	return false;
-}
-
-
-/** helper for TestTrajectoryAllyCone and TestTrajectoryNeutralCone
-    @return true if the unit u is in the firing trajectory, false otherwise */
+/**
+    helper for TestTrajectoryCone
+    @return true if the unit u is in the firing trajectory
+*/
 bool CGameHelper::TestTrajectoryConeHelper(const float3& from, const float3& flatdir, float length, float linear, float quadratic, float spread, float baseSize, const CUnit* u)
 {
 	const CollisionVolume* cv = u->collisionVolume;

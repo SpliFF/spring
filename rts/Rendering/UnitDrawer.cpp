@@ -207,9 +207,8 @@ CUnitDrawer::~CUnitDrawer()
 
 bool CUnitDrawer::LoadModelShaders()
 {
+	#define sh shaderHandler
 	modelShaders.resize(MODEL_SHADER_S3O_LAST, NULL);
-
-	CShaderHandler* sh = shaderHandler;
 
 	modelShaders[MODEL_SHADER_S3O_BASIC ] = sh->CreateProgramObject("[UnitDrawer]", "S3OShaderDefARB", true);
 	modelShaders[MODEL_SHADER_S3O_SHADOW] = modelShaders[MODEL_SHADER_S3O_BASIC];
@@ -275,6 +274,7 @@ bool CUnitDrawer::LoadModelShaders()
 		modelShaders[MODEL_SHADER_S3O_ACTIVE] = modelShaders[MODEL_SHADER_S3O_SHADOW];
 	}
 
+	#undef sh
 	return true;
 }
 
@@ -327,7 +327,7 @@ void CUnitDrawer::Update()
 	if (useDistToGroundForIcons) {
 		const float3& camPos = camera->pos;
 		// use the height at the current camera position
-		//const float groundHeight = ground->GetHeight(camPos.x, camPos.z);
+		//const float groundHeight = ground->GetHeightAboveWater(camPos.x, camPos.z);
 		// use the middle between the highest and lowest position on the map as average
 		const float groundHeight = (readmap->currMinHeight + readmap->currMaxHeight) / 2;
 		const float overGround = camPos.y - groundHeight;
@@ -887,7 +887,7 @@ void CUnitDrawer::DrawIcon(CUnit* unit, bool asRadarBlip)
 	}
 
 	// If the icon is partly under the ground, move it up.
-	const float h = ground->GetHeight(pos.x, pos.z);
+	const float h = ground->GetHeightAboveWater(pos.x, pos.z);
 	if (pos.y < (h + scale)) {
 		pos.y = (h + scale);
 	}
@@ -1142,7 +1142,7 @@ void CUnitDrawer::DrawGhostedBuildings(int modelType)
 				(*it)->decal->gbOwner = 0;
 
 			delete *it;
-			deadGhostedBuildings.erase(it++);
+			it = set_erase(deadGhostedBuildings, it);
 		} else {
 			if (camera->InView((*it)->pos, (*it)->model->radius * 2.0f)) {
 				glPushMatrix();
@@ -1561,7 +1561,8 @@ void CUnitDrawer::DrawBuildingSample(const UnitDef* unitdef, int side, float3 po
 		case MODELTYPE_3DO: {
 			texturehandler3DO->Set3doAtlases();
 		} break;
-		case MODELTYPE_S3O: {
+		case MODELTYPE_S3O:
+		case MODELTYPE_OBJ: {
 			texturehandlerS3O->SetS3oTexture(model->textureType);
 		} break;
 		default: {
@@ -1718,13 +1719,13 @@ void DrawUnitDebugPieceTree(const LocalModelPiece* p, const LocalModelPiece* lap
 	glPushMatrix();
 		glMultMatrixf(mat.m);
 
-		if (p->visible && !p->colvol->IsDisabled()) {
+		if (p->visible && !p->GetCollisionVolume()->IsDisabled()) {
 			if ((p == lap) && (lapf > 0 && ((gs->frameNum - lapf) < 150))) {
 				glLineWidth(2.0f);
 				glColor3f((1.0f - ((gs->frameNum - lapf) / 150.0f)), 0.0f, 0.0f);
 			}
 
-			DrawCollisionVolume(p->colvol, q);
+			DrawCollisionVolume(p->GetCollisionVolume(), q);
 
 			if ((p == lap) && (lapf > 0 && ((gs->frameNum - lapf) < 150))) {
 				glLineWidth(1.0f);
@@ -2118,7 +2119,7 @@ inline void CUnitDrawer::UpdateUnitIconState(CUnit* unit) {
 			drawStat.insert(unit);
 #endif
 	} else if ((losStatus & LOS_PREVLOS) && (losStatus & LOS_CONTRADAR)) {
-		if (gameSetup->ghostedBuildings && unit->mobility == NULL) {
+		if (gameSetup->ghostedBuildings && unit->unitDef->IsImmobileUnit()) {
 			unit->isIcon = DrawAsIcon(unit, (unit->pos - camera->pos).SqLength());
 		}
 	}
@@ -2306,7 +2307,7 @@ void CUnitDrawer::RenderUnitDestroyed(const CUnit* u) {
 	if (building != NULL) {
 		GhostBuilding* gb = NULL;
 
-		if (!gameSetup || gameSetup->ghostedBuildings) {
+		if (gameSetup->ghostedBuildings) {
 			if (!(building->losStatus[gu->myAllyTeam] & (LOS_INLOS | LOS_CONTRADAR)) &&
 				(building->losStatus[gu->myAllyTeam] & (LOS_PREVLOS)) &&
 				!gu->spectatingFullView) {
@@ -2369,16 +2370,16 @@ void CUnitDrawer::RenderUnitLOSChanged(const CUnit* unit, int allyTeam, int newS
 
 	if (newStatus & LOS_INLOS) {
 		if (allyTeam == gu->myAllyTeam) {
-			if ((!gameSetup || gameSetup->ghostedBuildings) && !(u->mobility)) {
-				liveGhostBuildings[MDL_TYPE(u)].erase(u);
+			if (gameSetup->ghostedBuildings && unit->unitDef->IsImmobileUnit()) {
+				liveGhostBuildings[MDL_TYPE(unit)].erase(u);
 			}
 		}
 		unitRadarIcons[allyTeam].erase(u);
 	} else {
 		if (newStatus & LOS_PREVLOS) {
 			if (allyTeam == gu->myAllyTeam) {
-				if ((!gameSetup || gameSetup->ghostedBuildings) && !(u->mobility)) {
-					liveGhostBuildings[MDL_TYPE(u)].insert(u);
+				if (gameSetup->ghostedBuildings && unit->unitDef->IsImmobileUnit()) {
+					liveGhostBuildings[MDL_TYPE(unit)].insert(u);
 				}
 			}
 		}

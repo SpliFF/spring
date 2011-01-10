@@ -15,12 +15,12 @@
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef _AIAICHEATS_H
-#define _AIAICHEATS_H
+#ifndef _AI_AI_CHEATS_H
+#define _AI_AI_CHEATS_H
 
 #include "IAICheats.h"
 
-class SSkirmishAICallback;
+struct SSkirmishAICallback;
 class CAIAICallback;
 
 /**
@@ -53,8 +53,7 @@ public:
 			int unitIds_max);
 
 	int GetFeatures(int *features, int max);
-	int GetFeatures(int *features, int max, const float3& pos,
-			float radius);
+	int GetFeatures(int *features, int max, const float3& pos, float radius);
 
 	int GetUnitTeam(int unitid);
 	int GetUnitAllyTeam(int unitid);
@@ -90,4 +89,4 @@ private:
 	void SetCheatsEnabled(bool enable);
 };
 
-#endif // _AIAICHEATS_H
+#endif // _AI_AI_CHEATS_H

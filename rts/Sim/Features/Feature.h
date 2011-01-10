@@ -20,7 +20,6 @@ struct FeatureDef;
 class CUnit;
 struct DamageArray;
 class CFireProjectile;
-struct CollisionVolume;
 
 
 
@@ -46,7 +45,7 @@ public:
 	 */
 	bool AddBuildPower(float amount, CUnit* builder);
 	void DoDamage(const DamageArray& damages, const float3& impulse);
-	void Kill(float3& impulse);
+	void Kill(const float3& impulse);
 	void ForcedMove(const float3& newPos, bool snapToGround = true);
 	void ForcedSpin(const float3& newDir);
 	virtual bool Update(void);
@@ -78,6 +77,7 @@ public:
 		}
 	}
 
+public:
 	std::string createdFromUnit;
 	/**
 	 * This flag is used to stop a potential exploit involving tripping
@@ -100,7 +100,6 @@ public:
 
 	const FeatureDef* def;
 	std::string defName;
-	CollisionVolume* collisionVolume;
 
 	CMatrix44f transMatrix;
 

@@ -11,6 +11,7 @@
 
 class CUnit;
 struct DamageArray;
+struct CollisionVolume;
 
 
 class CSolidObject: public CWorldObject {
@@ -22,7 +23,6 @@ public:
 		Floating,
 		Hovering,
 		Flying,
-		Submarine
 	};
 
 	CSolidObject();
@@ -30,12 +30,16 @@ public:
 
 	virtual bool AddBuildPower(float amount, CUnit* builder);
 
-	virtual void DoDamage(const DamageArray& damages, CUnit* attacker, const float3& impulse) {};
-	virtual void Kill(float3& impulse) {};
+	virtual void DoDamage(const DamageArray& damages, CUnit* attacker, const float3& impulse) {}
+	virtual void Kill(const float3& impulse) {}
 	virtual int GetBlockingMapID() const { return -1; }
 
 	void Block();
 	void UnBlock();
+
+public:
+	// Collision properties
+	CollisionVolume* collisionVolume;
 
 	// Static properties
 	float mass;									///< the physical mass of this object
@@ -78,6 +82,8 @@ public:
 
 	int2 GetMapPos();
 	int2 GetMapPos(const float3& position);
+
+	static const float DEFAULT_MASS;
 };
 
 #endif

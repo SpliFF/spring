@@ -142,12 +142,12 @@ bool CCannon::TryTarget(const float3 &pos, bool userTarget, CUnit* unit)
 		((accuracy + sprayAngle) * 0.6f) *
 		((1.0f - owner->limExperience * weaponDef->ownerExpAccWeight) * 0.9f);
 
-	if (avoidFriendly && helper->TestTrajectoryAllyCone(weaponMuzzlePos, flatdir,
-		flatlength - 30, dir.y, quadratic, spread, 3, owner->allyteam, owner)) {
+	if (avoidFriendly && helper->TestTrajectoryCone(weaponMuzzlePos, flatdir,
+		flatlength - 30, dir.y, quadratic, spread, 3, owner, CGameHelper::TEST_ALLIED)) {
 		return false;
 	}
-	if (avoidNeutral && helper->TestTrajectoryNeutralCone(weaponMuzzlePos, flatdir,
-		flatlength - 30, dir.y, quadratic, spread, 3, owner)) {
+	if (avoidNeutral && helper->TestTrajectoryCone(weaponMuzzlePos, flatdir,
+		flatlength - 30, dir.y, quadratic, spread, 3, owner, CGameHelper::TEST_NEUTRAL)) {
 		return false;
 	}
 
@@ -200,7 +200,7 @@ void CCannon::SlowUpdate(void)
 bool CCannon::AttackGround(float3 pos,bool userTarget)
 {
 	if(owner->directControl)		//mostly prevents firing longer than max range using fps mode
-		pos.y=ground->GetHeight(pos.x,pos.z);
+		pos.y=ground->GetHeightAboveWater(pos.x,pos.z);
 
 	return CWeapon::AttackGround(pos,userTarget);
 }

@@ -339,6 +339,27 @@ struct SSkirmishAICallback {
 
 	const char*       (CALLING_CONV *Game_getSetupScript)(int skirmishAIId);
 
+	/**
+	 * Returns the categories bit field value.
+	 * @return the categories bit field value or 0,
+	 *         in case of empty name or too many categories
+	 * @see getCategoryName
+	 */
+	int               (CALLING_CONV *Game_getCategoryFlag)(int skirmishAIId, const char* categoryName);
+
+	/**
+	 * Returns the bitfield values of a list of category names.
+	 * @param categoryNames space delimited list of names
+	 * @see #getCategoryFlag
+	 */
+	int               (CALLING_CONV *Game_getCategoriesFlag)(int skirmishAIId, const char* categoryNames);
+
+	/**
+	 * Return the name of the category described by a category flag.
+	 * @see #getCategoryFlag
+	 */
+	void              (CALLING_CONV *Game_getCategoryName)(int skirmishAIId, int categoryFlag, char* name, int name_sizeMax);
+
 // END misc callback functions
 
 
@@ -435,12 +456,14 @@ struct SSkirmishAICallback {
 
 	const char*       (CALLING_CONV *UnitDef_getFileName)(int skirmishAIId, int unitDefId);
 
+	/** @deprecated */
 	int               (CALLING_CONV *UnitDef_getAiHint)(int skirmishAIId, int unitDefId);
 
 	int               (CALLING_CONV *UnitDef_getCobId)(int skirmishAIId, int unitDefId);
 
 	int               (CALLING_CONV *UnitDef_getTechLevel)(int skirmishAIId, int unitDefId);
 
+	/** @deprecated */
 	const char*       (CALLING_CONV *UnitDef_getGaia)(int skirmishAIId, int unitDefId);
 
 	float             (CALLING_CONV *UnitDef_getUpkeep)(int skirmishAIId, int unitDefId, int resourceId); //$ REF:resourceId->Resource
@@ -483,6 +506,11 @@ struct SSkirmishAICallback {
 
 	float             (CALLING_CONV *UnitDef_getHealth)(int skirmishAIId, int unitDefId);
 
+	/**
+	 * Returns the bit field value denoting the categories this unit is in.
+	 * @see Game#getCategoryFlag
+	 * @see Game#getCategoryName
+	 */
 	int               (CALLING_CONV *UnitDef_getCategory)(int skirmishAIId, int unitDefId);
 
 	float             (CALLING_CONV *UnitDef_getSpeed)(int skirmishAIId, int unitDefId);
@@ -614,6 +642,7 @@ struct SSkirmishAICallback {
 
 	float             (CALLING_CONV *UnitDef_getMaxWeaponRange)(int skirmishAIId, int unitDefId);
 
+	/** @deprecated */
 	const char*       (CALLING_CONV *UnitDef_getType)(int skirmishAIId, int unitDefId);
 
 	const char*       (CALLING_CONV *UnitDef_getTooltip)(int skirmishAIId, int unitDefId);
@@ -624,6 +653,11 @@ struct SSkirmishAICallback {
 
 	const char*       (CALLING_CONV *UnitDef_getSelfDExplosion)(int skirmishAIId, int unitDefId);
 
+	/**
+	 * Returns the name of the category this unit is in.
+	 * @see Game#getCategoryFlag
+	 * @see Game#getCategoryName
+	 */
 	const char*       (CALLING_CONV *UnitDef_getCategoryString)(int skirmishAIId, int unitDefId);
 
 	bool              (CALLING_CONV *UnitDef_isAbleToSelfD)(int skirmishAIId, int unitDefId);
@@ -744,6 +778,7 @@ struct SSkirmishAICallback {
 
 	int               (CALLING_CONV *UnitDef_getZSize)(int skirmishAIId, int unitDefId);
 
+	/** @deprecated */
 	int               (CALLING_CONV *UnitDef_getBuildAngle)(int skirmishAIId, int unitDefId);
 
 // beginn: transports stuff
@@ -845,6 +880,12 @@ struct SSkirmishAICallback {
 	 */
 	int               (CALLING_CONV *UnitDef_getHighTrajectoryType)(int skirmishAIId, int unitDefId);
 
+	/**
+	 * Returns the bit field value denoting the categories this unit shall not
+	 * chase.
+	 * @see Game#getCategoryFlag
+	 * @see Game#getCategoryName
+	 */
 	int               (CALLING_CONV *UnitDef_getNoChaseCategory)(int skirmishAIId, int unitDefId);
 
 	bool              (CALLING_CONV *UnitDef_isLeaveTracks)(int skirmishAIId, int unitDefId);
@@ -926,15 +967,21 @@ struct SSkirmishAICallback {
 
 	bool              (CALLING_CONV *UnitDef_isMoveDataAvailable)(int skirmishAIId, int unitDefId); //$ AVAILABLE:MoveData
 
+	/// @deprecated
 	float             (CALLING_CONV *UnitDef_MoveData_getMaxAcceleration)(int skirmishAIId, int unitDefId);
 
+	/// @deprecated
 	float             (CALLING_CONV *UnitDef_MoveData_getMaxBreaking)(int skirmishAIId, int unitDefId);
 
+	/// @deprecated
 	float             (CALLING_CONV *UnitDef_MoveData_getMaxSpeed)(int skirmishAIId, int unitDefId);
 
+	/// @deprecated
 	short             (CALLING_CONV *UnitDef_MoveData_getMaxTurnRate)(int skirmishAIId, int unitDefId);
 
-	int               (CALLING_CONV *UnitDef_MoveData_getSize)(int skirmishAIId, int unitDefId);
+	int               (CALLING_CONV *UnitDef_MoveData_getXSize)(int skirmishAIId, int unitDefId);
+
+	int               (CALLING_CONV *UnitDef_MoveData_getZSize)(int skirmishAIId, int unitDefId);
 
 	float             (CALLING_CONV *UnitDef_MoveData_getDepth)(int skirmishAIId, int unitDefId);
 
@@ -981,8 +1028,20 @@ struct SSkirmishAICallback {
 	 */
 	float             (CALLING_CONV *UnitDef_WeaponMount_getFuelUsage)(int skirmishAIId, int unitDefId, int weaponMountId);
 
+	/**
+	 * Returns the bit field value denoting the categories this weapon should
+	 * not target.
+	 * @see Game#getCategoryFlag
+	 * @see Game#getCategoryName
+	 */
 	int               (CALLING_CONV *UnitDef_WeaponMount_getBadTargetCategory)(int skirmishAIId, int unitDefId, int weaponMountId);
 
+	/**
+	 * Returns the bit field value denoting the categories this weapon should
+	 * target, excluding all others.
+	 * @see Game#getCategoryFlag
+	 * @see Game#getCategoryName
+	 */
 	int               (CALLING_CONV *UnitDef_WeaponMount_getOnlyTargetCategory)(int skirmishAIId, int unitDefId, int weaponMountId);
 
 // END OBJECT UnitDef
@@ -1082,6 +1141,9 @@ struct SSkirmishAICallback {
 	 */
 	int               (CALLING_CONV *Unit_getModParams)(int skirmishAIId, int unitId); //$ FETCHER:MULTI:NUM:ModParam
 
+	/**
+	 * Not every mod parameter has a name.
+	 */
 	const char*       (CALLING_CONV *Unit_ModParam_getName)(int skirmishAIId, int unitId, int modParamId);
 
 	float             (CALLING_CONV *Unit_ModParam_getValue)(int skirmishAIId, int unitId, int modParamId);
@@ -1106,6 +1168,7 @@ struct SSkirmishAICallback {
 	 *          1: ???
 	 *          2: ???
 	 *          ...
+	 * @deprecated
 	 */
 	int               (CALLING_CONV *Unit_getAiHint)(int skirmishAIId, int unitId);
 
@@ -1124,7 +1187,7 @@ struct SSkirmishAICallback {
 	/** The unit's max health */
 	float             (CALLING_CONV *Unit_getMaxHealth)(int skirmishAIId, int unitId);
 
-	/** How experienced the unit is (0.0f-1.0f) */
+	/** How experienced the unit is (0.0f - 1.0f) */
 	float             (CALLING_CONV *Unit_getExperience)(int skirmishAIId, int unitId);
 
 	/** Returns the group a unit belongs to, -1 if none */
@@ -1485,8 +1548,8 @@ struct SSkirmishAICallback {
 	 * Returns the height for the center of the squares.
 	 * This differs slightly from the drawn map, since
 	 * that one uses the height at the corners.
-	 * Note that the actual map is 8 times larger (in each dimension) and 
-	 * all other maps (slope, los, resources, etc.) are relative to the 
+	 * Note that the actual map is 8 times larger (in each dimension) and
+	 * all other maps (slope, los, resources, etc.) are relative to the
 	 * size of the heightmap.
 	 *
 	 * - do NOT modify or delete the height-map (native code relevant only)
@@ -2016,6 +2079,12 @@ struct SSkirmishAICallback {
 
 	float             (CALLING_CONV *WeaponDef_getExplosionSpeed)(int skirmishAIId, int weaponDefId);
 
+	/**
+	 * Returns the bit field value denoting the categories this weapon should
+	 * target, excluding all others.
+	 * @see Game#getCategoryFlag
+	 * @see Game#getCategoryName
+	 */
 	int               (CALLING_CONV *WeaponDef_getOnlyTargetCategory)(int skirmishAIId, int weaponDefId);
 
 	/** How much the missile will wobble around its course. */

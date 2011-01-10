@@ -55,26 +55,25 @@ CR_REG_METADATA(CFeature, (
 				));
 
 
-CFeature::CFeature():
+CFeature::CFeature() : CSolidObject(),
 	isRepairingBeforeResurrect(false),
-	resurrectProgress(0),
-	health(0),
-	reclaimLeft(1),
+	resurrectProgress(0.0f),
+	health(0.0f),
+	reclaimLeft(1.0f),
 	luaDraw(false),
 	noSelect(false),
 	tempNum(0),
 	lastReclaim(0),
-	def(0),
-	collisionVolume(0),
+	def(NULL),
 	inUpdateQue(false),
 	drawQuad(-2),
-	finalHeight(0),
+	finalHeight(0.0f),
 	reachedFinalPos(false),
-	myFire(0),
+	myFire(NULL),
 	fireTime(0),
 	emitSmokeTime(0),
-	solidOnTop(0),
-	tempalpha(1)
+	solidOnTop(NULL),
+	tempalpha(1.0f)
 {
 	immobile = true;
 	physicalState = OnGround;
@@ -100,16 +99,13 @@ CFeature::~CFeature()
 	if (def->geoThermal) {
 		CGeoThermSmokeProjectile::GeoThermDestroyed(this);
 	}
-
-	delete collisionVolume;
-	collisionVolume = NULL;
 }
 
 void CFeature::PostLoad()
 {
 	def = featureHandler->GetFeatureDef(defName);
 	if (def->drawType == DRAWTYPE_MODEL) {
-		model = LoadModel(def);
+		model = def->LoadModel();
 		height = model->height;
 		SetRadius(model->radius);
 		midPos = pos + model->relMidPos;
@@ -159,7 +155,7 @@ void CFeature::Initialize(const float3& _pos, const FeatureDef* _def, short int 
 	noSelect = def->noSelect;
 
 	if (def->drawType == DRAWTYPE_MODEL) {
-		model = LoadModel(def);
+		model = def->LoadModel();
 		if (!model) {
 			logOutput.Print("Features: Couldn't load model for " + defName);
 			SetRadius(0.0f);
@@ -168,6 +164,8 @@ void CFeature::Initialize(const float3& _pos, const FeatureDef* _def, short int 
 			height = model->height;
 			SetRadius(model->radius);
 			midPos = pos + model->relMidPos;
+
+			// note: gets deleted in ~CSolidObject
 			collisionVolume = new CollisionVolume(def->collisionVolume, model->radius);
 		}
 	}
@@ -177,6 +175,7 @@ void CFeature::Initialize(const float3& _pos, const FeatureDef* _def, short int 
 		height = 2 * TREE_RADIUS;
 
 		// LoadFeaturesFromMap() doesn't set a scale for trees
+		// note: gets deleted in ~CSolidObject
 		collisionVolume = new CollisionVolume(def->collisionVolume, TREE_RADIUS);
 	}
 	else {
@@ -195,9 +194,9 @@ void CFeature::Initialize(const float3& _pos, const FeatureDef* _def, short int 
 	}
 
 	if (def->floating) {
-		finalHeight = ground->GetHeight(pos.x, pos.z);
+		finalHeight = ground->GetHeightAboveWater(pos.x, pos.z);
 	} else {
-		finalHeight = ground->GetHeight2(pos.x, pos.z);
+		finalHeight = ground->GetHeightReal(pos.x, pos.z);
 	}
 
 	if (speed != ZeroVector) {
@@ -389,7 +388,7 @@ void CFeature::DoDamage(const DamageArray& damages, const float3& impulse)
 }
 
 
-void CFeature::Kill(float3& impulse) {
+void CFeature::Kill(const float3& impulse) {
 	DamageArray damage;
 	DoDamage(damage * (health + 1), impulse);
 }
@@ -423,9 +422,9 @@ void CFeature::ForcedMove(const float3& newPos, bool snapToGround)
 	// setup finalHeight
 	if (snapToGround) {
 		if (def->floating) {
-			finalHeight = ground->GetHeight(pos.x, pos.z);
+			finalHeight = ground->GetHeightAboveWater(pos.x, pos.z);
 		} else {
-			finalHeight = ground->GetHeight2(pos.x, pos.z);
+			finalHeight = ground->GetHeightReal(pos.x, pos.z);
 		}
 	} else {
 		finalHeight = newPos.y;
@@ -503,7 +502,7 @@ bool CFeature::UpdatePosition()
 			// def->floating is unreliable (true for land unit wrecks),
 			// just assume wrecks always sink even if their "owner" was
 			// a floating object (as is the case for ships anyway)
-			float realGroundHeight = ground->GetHeight2(pos.x, pos.z);
+			float realGroundHeight = ground->GetHeightReal(pos.x, pos.z);
 			bool reachedGround = (pos.y <= realGroundHeight);
 
 			if (!reachedGround) {

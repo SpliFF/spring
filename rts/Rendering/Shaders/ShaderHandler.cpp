@@ -69,7 +69,6 @@ Shader::IProgramObject* CShaderHandler::CreateProgramObject(
 
 	po->AttachShaderObject(vso);
 	po->AttachShaderObject(fso);
-
 	po->Link();
 
 	if (!po->IsValid()) {
@@ -86,20 +85,28 @@ Shader::IShaderObject* CShaderHandler::CreateShaderObject(const std::string& soN
 
 	bool arbShader = false;
 
-	std::string soSource("");
-	CFileHandler soFile("shaders/" + soName);
+	std::string soPath = "shaders/" + soName;
+	std::string soSource = "";
+
+	CFileHandler soFile(soPath);
 
 	if (soFile.FileExists()) {
+		std::vector<char> soFileBuffer(soFile.FileSize() + 1, 0);
+		soFile.Read(&soFileBuffer[0], soFile.FileSize());
+
 		arbShader =
 			soName.find(".glsl") == std::string::npos &&
 			soName.find(".vert") == std::string::npos &&
 			soName.find(".frag") == std::string::npos;
-
-		std::vector<char> soFileBuffer(soFile.FileSize() + 1, 0);
-		soFile.Read(&soFileBuffer[0], soFile.FileSize());
-
 		soSource = std::string(&soFileBuffer[0]);
 	} else {
+		logOutput.Print("[CShaderHandler::CreateShaderObject]\n");
+		logOutput.Print(
+			"\tfile \"%s\" does not exist, interpreting"
+			" \"%s\" as literal shader source-string\n",
+			soPath.c_str(), soName.c_str()
+		);
+
 		arbShader =
 			(soName.find("!!ARBvp") != std::string::npos) ||
 			(soName.find("!!ARBfp") != std::string::npos);

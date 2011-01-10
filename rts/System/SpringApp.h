@@ -5,10 +5,10 @@
 
 #include <string>
 #include <boost/cstdint.hpp>
-#include "System/OffscreenGLContext.h"
 
 class BaseCmd;
 class CGameController;
+class COffscreenGLContext;
 union SDL_Event;
 
 /**
@@ -40,10 +40,9 @@ protected:
 #if defined(USE_GML) && GML_ENABLE_SIM
 	int Sim();                                      //!< Simulation  loop
 	static void Simcb(void *c) {((SpringApp *)c)->Sim();}
-	volatile int gmlKeepRunning;
+	static volatile int gmlKeepRunning;
 #endif
 
-	void UpdateSDLKeys();                           //!< Update SDL key array
 	bool GetDisplayGeometry();
 	void SetupViewportGeometry();
 
@@ -113,7 +112,7 @@ protected:
 	 */
 	int lastRequiredDraw;
 
-	COffscreenGLContext *ogc;
+	static COffscreenGLContext* ogc;
 
 private:
 	bool MainEventHandler(const SDL_Event& ev);
@@ -126,27 +125,5 @@ private:
  * (could be a PreGame, could be a Game, etc)
  */
 extern CGameController* activeController;
-
-/**
- * @brief global quit
- *
- * Global boolean indicating whether the user
- * wants to quit
- */
-extern volatile bool globalQuit;
-
-/**
- * @brief keys
- *
- * Array of possible keys, and which are being pressed
- */
-extern boost::uint8_t *keys;
-
-/**
- * @brief currentUnicode
- *
- * Unicode character for the current KeyPressed or KeyReleased
- */
-extern boost::uint16_t currentUnicode;
 
 #endif

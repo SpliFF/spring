@@ -526,7 +526,8 @@ static int MoveDataTable(lua_State* L, const void* data)
 		default: { HSTR_PUSH_STRING(L, "family", "error"); break; }
 	}
 
-	HSTR_PUSH_NUMBER(L, "size",          md->size);
+	HSTR_PUSH_NUMBER(L, "xsize",         md->xsize);
+	HSTR_PUSH_NUMBER(L, "zsize",         md->zsize);
 	HSTR_PUSH_NUMBER(L, "depth",         md->depth);
 	HSTR_PUSH_NUMBER(L, "maxSlope",      md->maxSlope);
 	HSTR_PUSH_NUMBER(L, "slopeMod",      md->slopeMod);
@@ -557,28 +558,27 @@ static int TotalEnergyOut(lua_State* L, const void* data)
 }
 
 
-#define TYPE_STRING_FUNC(name)                          \
-	static int Is ## name(lua_State* L, const void* data) \
-	{                                                     \
-		const string& type = *((const string*)data);        \
-		lua_pushboolean(L, type == #name);                  \
-		return 1;                                           \
+
+#define TYPE_BOOL_FUNC(FuncName)                        \
+	static int FuncName(lua_State* L, const void* data) \
+	{                                                   \
+		const UnitDef* ud = (const UnitDef*) data;      \
+		lua_pushboolean(L, ud->FuncName());             \
+		return 1;                                       \
 	}
 
-TYPE_STRING_FUNC(Bomber);
-TYPE_STRING_FUNC(Builder);
-TYPE_STRING_FUNC(Building);
-TYPE_STRING_FUNC(Factory);
-TYPE_STRING_FUNC(Fighter);
-TYPE_STRING_FUNC(Transport);
-TYPE_STRING_FUNC(GroundUnit);
-TYPE_STRING_FUNC(MetalExtractor);
+TYPE_BOOL_FUNC(IsImmobileUnit);
+TYPE_BOOL_FUNC(IsFactoryUnit);
+TYPE_BOOL_FUNC(IsFighterUnit);
+TYPE_BOOL_FUNC(IsBomberUnit);
+TYPE_BOOL_FUNC(IsGroundUnit);
+
 
 
 #define TYPE_MODEL_FUNC(name, param)                  \
 	static int name(lua_State* L, const void* data)   \
 	{                                                 \
-		const UnitDef* ud = ((const UnitDef*) data);  \
+		const UnitDef* ud = (const UnitDef*) data;    \
 		const S3DModel* model = ud->LoadModel();      \
 		lua_pushnumber(L, model->param);              \
 		return 1;                                     \
@@ -636,14 +636,11 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FUNCTION("stockpileWeaponDef", ud.stockpileWeaponDef, WeaponDefToID);
 	ADD_FUNCTION("iconType",           ud.iconType,           SafeIconType);
 
-	ADD_FUNCTION("isBomber",         ud.type, IsBomber);
-	ADD_FUNCTION("isBuilder",        ud.type, IsBuilder);
-	ADD_FUNCTION("isBuilding",       ud.type, IsBuilding);
-	ADD_FUNCTION("isFactory",        ud.type, IsFactory);
-	ADD_FUNCTION("isFighter",        ud.type, IsFighter);
-	ADD_FUNCTION("isTransport",      ud.type, IsTransport);
-	ADD_FUNCTION("isGroundUnit",     ud.type, IsGroundUnit);
-	ADD_FUNCTION("isMetalExtractor", ud.type, IsMetalExtractor);
+	ADD_FUNCTION("isBuilding",       ud, IsImmobileUnit); // !
+	ADD_FUNCTION("isFactory",        ud, IsFactoryUnit);
+	ADD_FUNCTION("isFighter",        ud, IsFighterUnit);
+	ADD_FUNCTION("isBomber",         ud, IsBomberUnit);
+	ADD_FUNCTION("isGroundUnit",     ud, IsGroundUnit);
 
 	ADD_FUNCTION("height",  ud, ModelHeight);
 	ADD_FUNCTION("radius",  ud, ModelRadius);
@@ -658,6 +655,7 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FUNCTION("maxz",    ud, ModelMaxz);
 
 	ADD_INT("id", ud.id);
+	ADD_INT("cobID", ud.cobID);
 
 	ADD_STRING("name",      ud.name);
 	ADD_STRING("humanName", ud.humanName);
@@ -665,22 +663,14 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 
 	ADD_STRING("tooltip", ud.tooltip);
 
-	ADD_STRING("type", ud.type);
-
-	ADD_STRING("gaia", ud.gaia);
-
 	ADD_STRING("wreckName", ud.wreckName);
 	ADD_STRING("deathExplosion", ud.deathExplosion);
 	ADD_STRING("selfDExplosion", ud.selfDExplosion);
 
 	ADD_STRING("buildpicname", ud.buildPicName);
 
-	ADD_INT("aihint", ud.aihint);
-	ADD_INT("cobID",  ud.cobID);
-
 	ADD_INT("techLevel",   ud.techLevel);
 	ADD_INT("maxThisUnit", ud.maxThisUnit);
-	ADD_BOOL("transportableBuilding", ud.transportableBuilding);
 
 	ADD_FLOAT("metalUpkeep",    ud.metalUpkeep);
 	ADD_FLOAT("energyUpkeep",   ud.energyUpkeep);
@@ -716,7 +706,7 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FLOAT("turnInPlaceDistance", ud.turnInPlaceDistance);
 	ADD_FLOAT("turnInPlaceSpeedLimit", ud.turnInPlaceSpeedLimit);
 
-	ADD_BOOL("upright",   ud.upright);
+	ADD_BOOL("upright", ud.upright);
 	ADD_BOOL("collide", ud.collide);
 
 	ADD_FLOAT("losHeight",     ud.losHeight);
@@ -848,8 +838,6 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_INT("xsize", ud.xsize);
 	ADD_INT("zsize", ud.zsize);
 
-	ADD_INT("buildangle", ud.buildangle);
-
 	// transport stuff
 	ADD_INT(  "transportCapacity",     ud.transportCapacity);
 	ADD_INT(  "transportSize",         ud.transportSize);
@@ -862,8 +850,8 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_BOOL( "cantBeTransported",     ud.cantBeTransported);
 	ADD_BOOL( "transportByEnemy",      ud.transportByEnemy);
 	ADD_INT(  "transportUnloadMethod", ud.transportUnloadMethod);
-	ADD_FLOAT("fallSpeed",			       ud.fallSpeed);
-	ADD_FLOAT("unitFallSpeed",		     ud.unitFallSpeed);
+	ADD_FLOAT("fallSpeed",             ud.fallSpeed);
+	ADD_FLOAT("unitFallSpeed",         ud.unitFallSpeed);
 
 	ADD_BOOL( "startCloaked",     ud.startCloaked);
 	ADD_FLOAT("cloakCost",        ud.cloakCost);
@@ -924,7 +912,6 @@ ADD_BOOL("canAttackWater",  canAttackWater); // CUSTOM
 	ADD_FLOAT("nanoColorG",   ud.nanoColor.y);
 	ADD_FLOAT("nanoColorB",   ud.nanoColor.z);
 
-//	vector<CExplosionGenerator*>  sfxExplGens;
 	ADD_STRING("pieceTrailCEGTag",   ud.pieceTrailCEGTag);
 	ADD_INT(   "pieceTrailCEGRange", ud.pieceTrailCEGRange);
 

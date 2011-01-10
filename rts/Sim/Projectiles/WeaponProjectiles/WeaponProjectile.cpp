@@ -39,8 +39,8 @@ CR_REG_METADATA(CWeaponProjectile,(
 	CR_MEMBER(ttl),
 	CR_MEMBER(bounces),
 	CR_MEMBER(keepBouncing),
-	CR_MEMBER(ceg),
 	CR_MEMBER(cegTag),
+	CR_MEMBER(cegID),
 	CR_MEMBER(interceptTarget),
 	CR_MEMBER(id),
 	CR_RESERVED(15),
@@ -58,7 +58,7 @@ CWeaponProjectile::CWeaponProjectile(): CProjectile()
 	interceptTarget = 0;
 	bounces = 0;
 	keepBouncing = true;
-	cegTag = "";
+	cegID = -1U;
 }
 
 CWeaponProjectile::CWeaponProjectile(const float3& pos, const float3& speed,
@@ -72,6 +72,7 @@ CWeaponProjectile::CWeaponProjectile(const float3& pos, const float3& speed,
 	target(target),
 	targetPos(targetPos),
 	cegTag(weaponDef? weaponDef->cegTag: std::string("")),
+	cegID(-1U),
 	colorTeam(0),
 	startpos(pos),
 	ttl(ttl),
@@ -108,64 +109,18 @@ CWeaponProjectile::CWeaponProjectile(const float3& pos, const float3& speed,
 	ph->AddProjectile(this);
 }
 
-CWeaponProjectile::~CWeaponProjectile(void)
-{
-}
+
 
 void CWeaponProjectile::Collision()
 {
-	if (/* !weaponDef->noExplode || gs->frameNum & 1 */ true) {
-		// don't do damage only on odd-numbered frames
-		// for noExplode projectiles (it breaks coldet)
-		float3 impactDir = speed;
-		impactDir.Normalize();
-
-		// Dynamic Damage
-		DamageArray dynDamages;
-		if (weaponDef->dynDamageExp > 0)
-			dynDamages = weaponDefHandler->DynamicDamages(weaponDef->damages,
-					startpos, pos, (weaponDef->dynDamageRange > 0)
-							? weaponDef->dynDamageRange
-							: weaponDef->range,
-					weaponDef->dynDamageExp, weaponDef->dynDamageMin,
-					weaponDef->dynDamageInverted);
-
-		helper->Explosion(
-			pos,
-			(weaponDef->dynDamageExp > 0)? dynDamages: weaponDef->damages,
-			weaponDef->areaOfEffect,
-			weaponDef->edgeEffectiveness,
-			weaponDef->explosionSpeed,
-			owner(),
-			true,
-			weaponDef->noExplode? 0.3f: 1.0f,
-			weaponDef->noExplode || weaponDef->noSelfDamage,
-			weaponDef->impactOnly,
-			weaponDef->explosionGenerator,
-			0,
-			impactDir,
-			weaponDef->id
-		);
-	}
-
-	if (weaponDef->soundhit.getID(0) > 0) {
-		Channels::Battle.PlaySample(weaponDef->soundhit.getID(0), this, weaponDef->soundhit.getVolume(0));
-	}
-
-	if (!weaponDef->noExplode){
-		CProjectile::Collision();
-	} else {
-		if (TraveledRange()) {
-			CProjectile::Collision();
-		}
-	}
-
+	Collision((CFeature*)NULL);
 }
 
 void CWeaponProjectile::Collision(CFeature* feature)
 {
-	if(gs->randFloat() < weaponDef->fireStarter)
+	if (feature && (gs->randFloat() < weaponDef->fireStarter)) {
 		feature->StartFire();
+	}
 
 	if (/* !weaponDef->noExplode || gs->frameNum & 1 */ true) {
 		// don't do damage only on odd-numbered frames
@@ -286,9 +241,9 @@ void CWeaponProjectile::UpdateGroundBounce()
 		float wh = 0;
 
 		if (!weaponDef->waterBounce) {
-			wh = ground->GetHeight2(pos.x, pos.z);
+			wh = ground->GetHeightReal(pos.x, pos.z);
 		} else if (weaponDef->groundBounce) {
-			wh = ground->GetHeight(pos.x, pos.z);
+			wh = ground->GetHeightAboveWater(pos.x, pos.z);
 		}
 
 		if (pos.y < wh) {
@@ -299,17 +254,18 @@ void CWeaponProjectile::UpdateGroundBounce()
 				//Collision();
 				keepBouncing = false;
 			} else {
-				float3 tempPos = pos;
 				const float3& normal = ground->GetNormal(pos.x, pos.z);
+				const float dot = speed.dot(normal);
+
 				pos -= speed;
-				float dot = speed.dot(normal);
-				speed -= (speed + normal*fabs(dot))*(1 - weaponDef->bounceSlip);
-				speed += (normal*(fabs(dot)))*(1 + weaponDef->bounceRebound);
+				speed -= (speed + normal * fabs(dot)) * (1 - weaponDef->bounceSlip);
+				speed += (normal * (fabs(dot))) * (1 + weaponDef->bounceRebound);
 				pos += speed;
 
 				if (weaponDef->bounceExplosionGenerator) {
-					weaponDef->bounceExplosionGenerator->Explosion(pos,
-							speed.Length(), 1, owner(), 1, NULL, normal);
+					weaponDef->bounceExplosionGenerator->Explosion(
+						-1U, pos, speed.Length(), 1, owner(), 1, NULL, normal
+					);
 				}
 			}
 		}
@@ -350,7 +306,7 @@ void CWeaponProjectile::PostLoad()
 
 	if (!weaponDef->visuals.modelName.empty()) {
 		if (weaponDef->visuals.model == NULL) {
-			std::string modelname = string("objects3d/") + weaponDef->visuals.modelName;
+			std::string modelname = "objects3d/" + weaponDef->visuals.modelName;
 			if (modelname.find(".") == std::string::npos) {
 				modelname += ".3do";
 			}

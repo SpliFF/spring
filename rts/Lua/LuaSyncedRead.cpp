@@ -4815,9 +4815,9 @@ static int GetUnitPieceInfo(lua_State* L, const ModelType& op)
 
 	HSTR_PUSH(L, "offset");
 	lua_newtable(L); {
-		lua_pushnumber(L, 1); lua_pushnumber(L, op.pos.x); lua_rawset(L, -3);
-		lua_pushnumber(L, 2); lua_pushnumber(L, op.pos.y); lua_rawset(L, -3);
-		lua_pushnumber(L, 3); lua_pushnumber(L, op.pos.z); lua_rawset(L, -3);
+		lua_pushnumber(L, 1); lua_pushnumber(L, op.offset.x); lua_rawset(L, -3);
+		lua_pushnumber(L, 2); lua_pushnumber(L, op.offset.y); lua_rawset(L, -3);
+		lua_pushnumber(L, 3); lua_pushnumber(L, op.offset.z); lua_rawset(L, -3);
 	}
 	lua_rawset(L, -3);
 	return 1;

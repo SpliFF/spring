@@ -72,9 +72,9 @@ SS3OPiece* CS3OParser::LoadPiece(S3DModel* model, SS3OPiece* parent, unsigned ch
 		piece->type = MODELTYPE_S3O;
 		piece->mins = DEF_MIN_SIZE;
 		piece->maxs = DEF_MAX_SIZE;
-		piece->pos.x = fp->xoffset;
-		piece->pos.y = fp->yoffset;
-		piece->pos.z = fp->zoffset;
+		piece->offset.x = fp->xoffset;
+		piece->offset.y = fp->yoffset;
+		piece->offset.z = fp->zoffset;
 		piece->rot = ZeroVector;
 		piece->scale = float3(1.0f, 1.0f, 1.0f);
 		piece->primitiveType = fp->primitiveType;

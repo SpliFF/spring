@@ -146,7 +146,7 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
     S3DModel* model = new S3DModel;
     model->name = modelFileName;
 	model->type = MODELTYPE_ASS;
-	model->numobjects = 0;
+	model->numPieces = 0;
     model->scene = scene;
     //model->meta = &metaTable;
 
@@ -198,13 +198,13 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
     model->maxs = metaTable.GetFloat3("maxs", model->maxs);
 
     // Calculate model dimensions if not set
-    if (!metaTable.KeyExists("mins") || !metaTable.KeyExists("maxs")) CalculateMinMax( model->rootobject );
+    if (!metaTable.KeyExists("mins") || !metaTable.KeyExists("maxs")) CalculateMinMax( model->rootPiece );
     if (model->radius < 0.0001f) CalculateRadius( model );
     if (model->height < 0.0001f) CalculateHeight( model );
 
     // Verbose logging of model properties
     logOutput.Print(LOG_MODEL_DETAIL, "model->name: %s", model->name.c_str());
-    logOutput.Print(LOG_MODEL_DETAIL, "model->numobjects: %d", model->numobjects);
+    logOutput.Print(LOG_MODEL_DETAIL, "model->numobjects: %d", model->numPieces);
     logOutput.Print(LOG_MODEL_DETAIL, "model->radius: %f", model->radius);
     logOutput.Print(LOG_MODEL_DETAIL, "model->height: %f", model->height);
     logOutput.Print(LOG_MODEL_DETAIL, "model->mins: (%f,%f,%f)", model->mins[0], model->mins[1], model->mins[2]);
@@ -273,7 +273,7 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
 		rotate.x, rotate.y, rotate.z,
 		scale.x, scale.y, scale.z
 	);
-	piece->pos = offset;
+	piece->offset = offset;
 	piece->rot = rotate;
 	piece->scale = scale;
 
@@ -440,7 +440,7 @@ void CAssParser::BuildPieceHierarchy( S3DModel* model )
         S3DModelPiece* piece = it->second;
         if (piece->name == "root") {
             piece->parent = NULL;
-            model->rootobject = piece;
+            model->SetRootPiece(piece);
         } else if (piece->parentName != "") {
             piece->parent = model->FindPiece(piece->parentName);
             if (piece->parent == NULL) {

@@ -60,7 +60,7 @@ void S3DModelPiece::DrawStatic() const
 
 S3DModelPiece::S3DModelPiece()
 {
-    pos = float3(0.0f,0.0f,0.0f);
+    offset = float3(0.0f,0.0f,0.0f);
 	rot = float3(0.0f,0.0f,0.0f);
 	scale = float3(1.0f,1.0f,1.0f);
 	mins = float3(10000.0f,  10000.0f,  10000.0f);
@@ -165,7 +165,7 @@ void LocalModelPiece::Draw() const
 
 	glPushMatrix();
 
-	if (pos.x || pos.y || pos.z) { glTranslatef(pos.x, pos.y, pos.z); }
+	if (offset.x || offset.y || offset.z) { glTranslatef(offset.x, offset.y, offset.z); }
 	if (rot[1]) { glRotatef(rot[1] * RADTOANG, 0.0f, 1.0f, 0.0f); }
 	if (rot[0]) { glRotatef(rot[0] * RADTOANG, 1.0f, 0.0f, 0.0f); }
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
@@ -188,7 +188,7 @@ void LocalModelPiece::DrawLOD(unsigned int lod) const
 
 	glPushMatrix();
 
-	if (pos.x || pos.y || pos.z) { glTranslatef(pos.x, pos.y, pos.z); }
+	if (offset.x || offset.y || offset.z) { glTranslatef(offset.x, offset.y, offset.z); }
 	if (rot[1]) { glRotatef(rot[1] * RADTOANG, 0.0f, 1.0f, 0.0f); }
 	if (rot[0]) { glRotatef(rot[0] * RADTOANG, 1.0f, 0.0f, 0.0f); }
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
@@ -210,7 +210,7 @@ void LocalModelPiece::ApplyTransform() const
 		parent->ApplyTransform();
 	}
 
-	if (pos.x || pos.y || pos.z) { glTranslatef(pos.x, pos.y, pos.z); }
+	if (offset.x || offset.y || offset.z) { glTranslatef(offset.x, offset.y, offset.z); }
 	if (rot[1]) { glRotatef(rot[1] * RADTOANG, 0.0f, 1.0f, 0.0f); }
 	if (rot[0]) { glRotatef(rot[0] * RADTOANG, 1.0f, 0.0f, 0.0f); }
 	if (rot[2]) { glRotatef(rot[2] * RADTOANG, 0.0f, 0.0f, 1.0f); }
@@ -223,7 +223,7 @@ void LocalModelPiece::GetPiecePosIter(CMatrix44f* mat) const
 		parent->GetPiecePosIter(mat);
 	}
 
-	if (pos.x || pos.y || pos.z) { mat->Translate(pos.x, pos.y, pos.z); }
+	if (offset.x || offset.y || offset.z) { mat->Translate(offset.x, offset.y, offset.z); }
 	if (rot[1]) { mat->RotateY(-rot[1]); }
 	if (rot[0]) { mat->RotateX(-rot[0]); }
 	if (rot[2]) { mat->RotateZ(-rot[2]); }

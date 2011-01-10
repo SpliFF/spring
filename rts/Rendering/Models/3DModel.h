@@ -48,15 +48,13 @@ struct S3DModelPiece {
 	void DrawStatic() const;
 
 	void SetCollisionVolume(CollisionVolume* cv) { colvol = cv; }
-	const CollisionVolume* GetCollisionVolume() const { return colvol; }
-	      CollisionVolume* GetCollisionVolume()       { return colvol; }
+	CollisionVolume* GetCollisionVolume()       { return colvol; }
 
 	unsigned int GetChildCount() const { return childs.size(); }
 	S3DModelPiece* GetChild(unsigned int i) { return childs[i]; }
 
-
-	int type;               //! MODELTYPE_*
 	std::string name;
+	int type;               //! MODELTYPE_*
     S3DModel* model;
 	S3DModelPiece* parent;
     std::string parentName;
@@ -93,8 +91,12 @@ struct S3DModel
 	void DrawStatic() const { rootPiece->DrawStatic(); }
     S3DModelPiece* FindPiece( std::string name );
 
-	// TODO: Move next 5 fields into S3DModelPiece for per-piece texturing (or remove entirely and put data into textures array)
-	int textureType;        //! FIXME: MAKE S3O ONLY (0 = 3DO, otherwise S3O or OBJ)
+    std::string name;
+	int id;                 //! unsynced ID, starting with 1
+	int type;               //! MODELTYPE_*
+
+	// TODO: Move next 5 fields into S3DModelPiece for per-piece texturing
+	int textureType;        //! FIXME: MAKE S3O ONLY (0 = 3DO, otherwise S3O or Assimp)
 	int flipTexY;			//! Turn both textures upside down before use
 	int invertAlpha;		//! Invert teamcolor alpha channel in S3O texture 1
 	std::string tex1;
@@ -152,8 +154,6 @@ struct LocalModelPiece
 
 	void SetCollisionVolume(CollisionVolume* cv) { colvol = cv; }
 	const CollisionVolume* GetCollisionVolume() const { return colvol; }
-	      CollisionVolume* GetCollisionVolume()       { return colvol; }
-
 
 	float3 pos;
 	float3 rot; //! in radian

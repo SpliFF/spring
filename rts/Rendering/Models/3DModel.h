@@ -47,11 +47,12 @@ struct S3DModelPiece {
 	virtual void Shatter(float, int, int, const float3&, const float3&) const {}
 	void DrawStatic() const;
 
-	void SetCollisionVolume(CollisionVolume* cv) { colvol = cv; }
-	CollisionVolume* GetCollisionVolume()       { return colvol; }
+    void SetCollisionVolume(CollisionVolume* cv) { colvol = cv; }
+    const CollisionVolume* GetCollisionVolume() const { return colvol; }
+    CollisionVolume* GetCollisionVolume() { return colvol; }
 
-	unsigned int GetChildCount() const { return childs.size(); }
-	S3DModelPiece* GetChild(unsigned int i) { return childs[i]; }
+    unsigned int GetChildCount() const { return childs.size(); }
+    S3DModelPiece* GetChild(unsigned int i) { return childs[i]; }
 
 	std::string name;
 	int type;               //! MODELTYPE_*
@@ -68,9 +69,9 @@ struct S3DModelPiece {
 	float3 mins;
 	float3 maxs;
 
-	float3 offset;		//! relative to parent
-	float3 goffset;		//! wrt. root
-	float3 rot; 		//! in radian
+	float3 goffset;     //! offset from model root
+	float3 offset;		//! offset from piece parent
+	float3 rot;			//! relative rotation in radians
 	float3 scale;		//! not used yet
 };
 

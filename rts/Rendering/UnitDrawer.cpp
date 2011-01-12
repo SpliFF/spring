@@ -1199,6 +1199,13 @@ void CUnitDrawer::SetupForUnitDrawing()
 	glEnable(GL_ALPHA_TEST);
 
 	if (advShading && !water->drawReflection) {
+		glMatrixMode(GL_PROJECTION);
+		glPushMatrix();
+		glMultMatrixd(camera->GetViewMat());
+		glMatrixMode(GL_MODELVIEW);
+		glPushMatrix();
+		glLoadIdentity();
+
 		// ARB standard does not seem to support
 		// vertex program + clipplanes (used for
 		// reflective pass) at once ==> not true,
@@ -1228,6 +1235,7 @@ void CUnitDrawer::SetupForUnitDrawing()
 
 			glMatrixMode(GL_MATRIX0_ARB);
 			glLoadMatrixf(shadowHandler->shadowMatrix.m);
+			glMatrixMode(GL_MODELVIEW);
 		}
 
 		glActiveTexture(GL_TEXTURE0);
@@ -1256,13 +1264,6 @@ void CUnitDrawer::SetupForUnitDrawing()
 		glActiveTexture(GL_TEXTURE0);
 
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-		glMatrixMode(GL_PROJECTION);
-		glPushMatrix();
-		glMultMatrixd(camera->GetViewMat());
-		glMatrixMode(GL_MODELVIEW);
-		glPushMatrix();
-		glLoadIdentity();
 	} else {
 		glEnable(GL_LIGHTING);
 		glLightfv(GL_LIGHT1, GL_POSITION, globalRendering->sunDir);
@@ -2510,6 +2511,7 @@ void CUnitDrawer::UpdateDynamicLightProperties(Shader::IProgramObject* shader) {
 			++it;
 
 			// communicate properties via the FFP to save uniforms
+			// note: we want MV to be identity here
 			glEnable(lightID);
 			glLightfv(lightID, GL_POSITION, &light.GetPosition().x);
 			glLightfv(lightID, GL_AMBIENT,  &weightedAmbientCol.x);

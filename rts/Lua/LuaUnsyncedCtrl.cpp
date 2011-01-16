@@ -1292,14 +1292,13 @@ int LuaUnsyncedCtrl::UpdateMapLight(lua_State* L) {
 
 	GL::LightHandler* lightHandler = readmap->GetGroundDrawer()->GetLightHandler();
 	GL::Light* light = (lightHandler != NULL)? lightHandler->GetLight(lua_tonumber(L, 1)): NULL;
+	bool ret = false; // sync-safety
 
 	if (light != NULL) {
 		ParseLight(L, 2, *light);
-		lua_pushboolean(L, true);
-	} else {
-		lua_pushboolean(L, false);
 	}
 
+	lua_pushboolean(L, ret);
 	return 1;
 }
 
@@ -1315,14 +1314,13 @@ int LuaUnsyncedCtrl::UpdateModelLight(lua_State* L) {
 
 	GL::LightHandler* lightHandler = unitDrawer->GetLightHandler();
 	GL::Light* light = (lightHandler != NULL)? lightHandler->GetLight(lua_tonumber(L, 1)): NULL;
+	bool ret = false; // sync-safety
 
 	if (light != NULL) {
 		ParseLight(L, 2, *light);
-		lua_pushboolean(L, true);
-	} else {
-		lua_pushboolean(L, false);
 	}
 
+	lua_pushboolean(L, ret);
 	return 1;
 }
 
@@ -1397,7 +1395,8 @@ int LuaUnsyncedCtrl::SetMapLightTrackingState(lua_State* L) {
 		ret = AddLightTrackingTarget(L, light, lua_toboolean(L, 3), lua_toboolean(L, 4));
 	}
 
-	lua_pushboolean(L, ret);
+	// sync-safety
+	lua_pushboolean(L, ret && false);
 	return 1;
 }
 
@@ -1421,7 +1420,8 @@ int LuaUnsyncedCtrl::SetModelLightTrackingState(lua_State* L) {
 		ret = AddLightTrackingTarget(L, light, lua_toboolean(L, 3), lua_toboolean(L, 4));
 	}
 
-	lua_pushboolean(L, ret);
+	// sync-safety
+	lua_pushboolean(L, ret && false);
 	return 1;
 }
 

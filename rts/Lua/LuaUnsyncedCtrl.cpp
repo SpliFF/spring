@@ -1301,7 +1301,7 @@ int LuaUnsyncedCtrl::UpdateMapLight(lua_State* L)
 	bool ret = false;
 
 	if (light != NULL) {
-		ret = ParseLight(L, 2, *light, __FUNCTION__));
+		ret = ParseLight(L, 2, *light, __FUNCTION__);
 	}
 
 	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
@@ -1319,7 +1319,7 @@ int LuaUnsyncedCtrl::UpdateModelLight(lua_State* L)
 	bool ret = false;
 
 	if (light != NULL) {
-		ret = ParseLight(L, 2, *light, __FUNCTION__));
+		ret = ParseLight(L, 2, *light, __FUNCTION__);
 	}
 
 	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {

@@ -1248,11 +1248,6 @@ static void ParseLight(lua_State* L, int tblIdx, GL::Light& light)
 
 int LuaUnsyncedCtrl::AddMapLight(lua_State* L)
 {
-	const CLuaHandle* activeHandle = CLuaHandle::GetActiveHandle();
-
-	if (activeHandle->GetSynced() || !activeHandle->GetFullRead()) {
-		return 0;
-	}
 	if (!lua_istable(L, 1)) {
 		luaL_error(L, "[%s] argument should be a table", __FUNCTION__);
 		return 0;
@@ -1274,11 +1269,6 @@ int LuaUnsyncedCtrl::AddMapLight(lua_State* L)
 
 int LuaUnsyncedCtrl::AddModelLight(lua_State* L)
 {
-	const CLuaHandle* activeHandle = CLuaHandle::GetActiveHandle();
-
-	if (activeHandle->GetSynced() || !activeHandle->GetFullRead()) {
-		return 0;
-	}
 	if (!lua_istable(L, 1)) {
 		luaL_error(L, "[%s] argument should be a table", __FUNCTION__);
 		return 0;
@@ -1301,11 +1291,6 @@ int LuaUnsyncedCtrl::AddModelLight(lua_State* L)
 
 int LuaUnsyncedCtrl::UpdateMapLight(lua_State* L)
 {
-	const CLuaHandle* activeHandle = CLuaHandle::GetActiveHandle();
-
-	if (activeHandle->GetSynced() || !activeHandle->GetFullRead()) {
-		return 0;
-	}
 	if (!lua_isnumber(L, 1)) {
 		luaL_error(L, "[%s] first argument should be a number", __FUNCTION__);
 		return 0;
@@ -1330,11 +1315,6 @@ int LuaUnsyncedCtrl::UpdateMapLight(lua_State* L)
 
 int LuaUnsyncedCtrl::UpdateModelLight(lua_State* L)
 {
-	const CLuaHandle* activeHandle = CLuaHandle::GetActiveHandle();
-
-	if (activeHandle->GetSynced() || !activeHandle->GetFullRead()) {
-		return 0;
-	}
 	if (!lua_isnumber(L, 1)) {
 		luaL_error(L, "[%s] first argument should be a number", __FUNCTION__);
 		return 0;
@@ -1363,7 +1343,7 @@ static bool AddLightTrackingTarget(lua_State* L, GL::Light* light, bool trackEna
 	bool ret = false;
 
 	if (trackUnit) {
-		CUnit* unit = ParseRawUnit(L, __FUNCTION__, 2);
+		CUnit* unit = ParseAllyUnit(L, __FUNCTION__, 2);
 
 		if (unit != NULL) {
 			if (trackEnable) {
@@ -1415,11 +1395,6 @@ static bool AddLightTrackingTarget(lua_State* L, GL::Light* light, bool trackEna
 // the position of a moving object (unit or projectile)
 int LuaUnsyncedCtrl::SetMapLightTrackingState(lua_State* L)
 {
-	const CLuaHandle* activeHandle = CLuaHandle::GetActiveHandle();
-
-	if (activeHandle->GetSynced() || !activeHandle->GetFullRead()) {
-		return 0;
-	}
 	if (!lua_isnumber(L, 1) || !lua_isnumber(L, 2) || !lua_isboolean(L, 3) || !lua_isboolean(L, 4)) {
 		luaL_error(L, "[%s] 1st and 2nd arguments should be numbers, 3rd and 4th should be booleans", __FUNCTION__);
 		return 0;
@@ -1441,11 +1416,6 @@ int LuaUnsyncedCtrl::SetMapLightTrackingState(lua_State* L)
 // the position of a moving object (unit or projectile)
 int LuaUnsyncedCtrl::SetModelLightTrackingState(lua_State* L)
 {
-	const CLuaHandle* activeHandle = CLuaHandle::GetActiveHandle();
-
-	if (activeHandle->GetSynced() || !activeHandle->GetFullRead()) {
-		return 0;
-	}
 	if (!lua_isnumber(L, 1) || !lua_isnumber(L, 2) || !lua_isboolean(L, 3) || !lua_isboolean(L, 4)) {
 		luaL_error(L, "[%s] 1st and 2nd arguments should be numbers, 3rd and 4th should be booleans", __FUNCTION__);
 		return 0;

@@ -1203,8 +1203,13 @@ int LuaUnsyncedCtrl::SetWaterParams(lua_State* L)
 
 
 
-static void ParseLight(lua_State* L, int tblIdx, GL::Light& light)
+static bool ParseLight(lua_State* L, int tblIdx, GL::Light& light, const char* caller)
 {
+	if (!lua_istable(L, tblIdx)) {
+		luaL_error(L, "[%s] argument %i must be a table!", caller, tblIdx);
+		return false;
+	}
+
 	for (lua_pushnil(L); lua_next(L, tblIdx) != 0; lua_pop(L, 1)) {
 		if (lua_israwstring(L, -2)) {
 			const std::string& key = lua_tostring(L, -2);
@@ -1243,24 +1248,21 @@ static void ParseLight(lua_State* L, int tblIdx, GL::Light& light)
 			}
 		}
 	}
+	return true;
 }
 
 
 int LuaUnsyncedCtrl::AddMapLight(lua_State* L)
 {
-	if (!lua_istable(L, 1)) {
-		luaL_error(L, "[%s] argument should be a table", __FUNCTION__);
-		return 0;
-	}
-
 	GL::LightHandler* lightHandler = readmap->GetGroundDrawer()->GetLightHandler();
 	GL::Light light;
 
 	unsigned int lightHandle = -1U;
 
 	if (lightHandler != NULL) {
-		ParseLight(L, 1, light);
-		lightHandle = lightHandler->AddLight(light);
+		if (ParseLight(L, 1, light, __FUNCTION__)) {
+			lightHandle = lightHandler->AddLight(light);
+		}
 	}
 
 	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
@@ -1272,19 +1274,15 @@ int LuaUnsyncedCtrl::AddMapLight(lua_State* L)
 
 int LuaUnsyncedCtrl::AddModelLight(lua_State* L)
 {
-	if (!lua_istable(L, 1)) {
-		luaL_error(L, "[%s] argument should be a table", __FUNCTION__);
-		return 0;
-	}
-
 	GL::LightHandler* lightHandler = unitDrawer->GetLightHandler();
 	GL::Light light;
 
 	unsigned int lightHandle = -1U;
 
 	if (lightHandler != NULL) {
-		ParseLight(L, 1, light);
-		lightHandle = lightHandler->AddLight(light);
+		if (ParseLight(L, 1, light, __FUNCTION__)) {
+			lightHandle = lightHandler->AddLight(light);
+		}
 	}
 
 	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
@@ -1297,22 +1295,13 @@ int LuaUnsyncedCtrl::AddModelLight(lua_State* L)
 
 int LuaUnsyncedCtrl::UpdateMapLight(lua_State* L)
 {
-	if (!lua_isnumber(L, 1)) {
-		luaL_error(L, "[%s] first argument should be a number", __FUNCTION__);
-		return 0;
-	}
-	if (!lua_istable(L, 2)) {
-		luaL_error(L, "[%s] second argument should be a table", __FUNCTION__);
-		return 0;
-	}
-
+	const unsigned int lightID = lua_checkint(L, 1);
 	GL::LightHandler* lightHandler = readmap->GetGroundDrawer()->GetLightHandler();
-	GL::Light* light = (lightHandler != NULL)? lightHandler->GetLight(lua_tonumber(L, 1)): NULL;
+	GL::Light* light = (lightHandler != NULL)? lightHandler->GetLight(lightID): NULL;
 	bool ret = false;
 
 	if (light != NULL) {
-		ParseLight(L, 2, *light);
-		ret = true;
+		ret = ParseLight(L, 2, *light, __FUNCTION__));
 	}
 
 	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
@@ -1324,22 +1313,13 @@ int LuaUnsyncedCtrl::UpdateMapLight(lua_State* L)
 
 int LuaUnsyncedCtrl::UpdateModelLight(lua_State* L)
 {
-	if (!lua_isnumber(L, 1)) {
-		luaL_error(L, "[%s] first argument should be a number", __FUNCTION__);
-		return 0;
-	}
-	if (!lua_istable(L, 2)) {
-		luaL_error(L, "[%s] second argument should be a table", __FUNCTION__);
-		return 0;
-	}
-
+	const unsigned int lightID = lua_checkint(L, 1);
 	GL::LightHandler* lightHandler = unitDrawer->GetLightHandler();
-	GL::Light* light = (lightHandler != NULL)? lightHandler->GetLight(lua_tonumber(L, 1)): NULL;
+	GL::Light* light = (lightHandler != NULL)? lightHandler->GetLight(lightID): NULL;
 	bool ret = false;
 
 	if (light != NULL) {
-		ParseLight(L, 2, *light);
-		ret = true;
+		ret = ParseLight(L, 2, *light, __FUNCTION__));
 	}
 
 	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
@@ -1350,12 +1330,12 @@ int LuaUnsyncedCtrl::UpdateModelLight(lua_State* L)
 }
 
 
-static bool AddLightTrackingTarget(lua_State* L, GL::Light* light, bool trackEnable, bool trackUnit)
+static bool AddLightTrackingTarget(lua_State* L, GL::Light* light, bool trackEnable, bool trackUnit, const char* caller)
 {
 	bool ret = false;
 
 	if (trackUnit) {
-		CUnit* unit = ParseAllyUnit(L, __FUNCTION__, 2);
+		CUnit* unit = ParseAllyUnit(L, caller, 2);
 
 		if (unit != NULL) {
 			if (trackEnable) {
@@ -1378,7 +1358,7 @@ static bool AddLightTrackingTarget(lua_State* L, GL::Light* light, bool trackEna
 	} else {
 		// only track synced projectiles (LuaSynced
 		// does not know about unsynced ID's anyway)
-		CProjectile* proj = ParseRawProjectile(L, __FUNCTION__, 2, true);
+		CProjectile* proj = ParseRawProjectile(L, caller, 2, true);
 
 		if (proj != NULL) {
 			if (trackEnable) {
@@ -1407,17 +1387,16 @@ static bool AddLightTrackingTarget(lua_State* L, GL::Light* light, bool trackEna
 // the position of a moving object (unit or projectile)
 int LuaUnsyncedCtrl::SetMapLightTrackingState(lua_State* L)
 {
-	if (!lua_isnumber(L, 1) || !lua_isnumber(L, 2) || !lua_isboolean(L, 3) || !lua_isboolean(L, 4)) {
-		luaL_error(L, "[%s] 1st and 2nd arguments should be numbers, 3rd and 4th should be booleans", __FUNCTION__);
-		return 0;
-	}
+	const unsigned int lightID = lua_checkint(L, 1);
+	const bool trackEnable = lua_isboolean(L, 3) ? lua_toboolean(L, 3) : true;
+	const bool trackUnit = lua_isboolean(L, 4) ? lua_toboolean(L, 4) : true;
 
 	GL::LightHandler* lightHandler = readmap->GetGroundDrawer()->GetLightHandler();
-	GL::Light* light = (lightHandler != NULL)? lightHandler->GetLight(lua_tointeger(L, 1)): NULL;
+	GL::Light* light = (lightHandler != NULL)? lightHandler->GetLight(lightID): NULL;
 	bool ret = false;
 
 	if (light != NULL) {
-		ret = AddLightTrackingTarget(L, light, lua_toboolean(L, 3), lua_toboolean(L, 4));
+		ret = AddLightTrackingTarget(L, light, trackEnable, trackUnit, __FUNCTION__);
 	}
 
 	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
@@ -1431,17 +1410,21 @@ int LuaUnsyncedCtrl::SetMapLightTrackingState(lua_State* L)
 // the position of a moving object (unit or projectile)
 int LuaUnsyncedCtrl::SetModelLightTrackingState(lua_State* L)
 {
-	if (!lua_isnumber(L, 1) || !lua_isnumber(L, 2) || !lua_isboolean(L, 3) || !lua_isboolean(L, 4)) {
+	if (!lua_isnumber(L, 2)) {
 		luaL_error(L, "[%s] 1st and 2nd arguments should be numbers, 3rd and 4th should be booleans", __FUNCTION__);
 		return 0;
 	}
 
+	const unsigned int lightID = lua_checkint(L, 1);
+	const bool trackEnable = lua_isboolean(L, 3) ? lua_toboolean(L, 3) : true;
+	const bool trackUnit = lua_isboolean(L, 4) ? lua_toboolean(L, 4) : true;
+
 	GL::LightHandler* lightHandler = unitDrawer->GetLightHandler();
-	GL::Light* light = (lightHandler != NULL)? lightHandler->GetLight(lua_tointeger(L, 1)): NULL;
+	GL::Light* light = (lightHandler != NULL)? lightHandler->GetLight(lightID): NULL;
 	bool ret = false;
 
 	if (light != NULL) {
-		ret = AddLightTrackingTarget(L, light, lua_toboolean(L, 3), lua_toboolean(L, 4));
+		ret = AddLightTrackingTarget(L, light, trackEnable, trackUnit, __FUNCTION__);
 	}
 
 	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {

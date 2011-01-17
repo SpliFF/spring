@@ -1203,7 +1203,8 @@ int LuaUnsyncedCtrl::SetWaterParams(lua_State* L)
 
 
 
-static void ParseLight(lua_State* L, int tblIdx, GL::Light& light) {
+static void ParseLight(lua_State* L, int tblIdx, GL::Light& light)
+{
 	for (lua_pushnil(L); lua_next(L, tblIdx) != 0; lua_pop(L, 1)) {
 		if (lua_israwstring(L, -2)) {
 			const std::string& key = lua_tostring(L, -2);
@@ -1245,7 +1246,8 @@ static void ParseLight(lua_State* L, int tblIdx, GL::Light& light) {
 }
 
 
-int LuaUnsyncedCtrl::AddMapLight(lua_State* L) {
+int LuaUnsyncedCtrl::AddMapLight(lua_State* L)
+{
 	const CLuaHandle* activeHandle = CLuaHandle::GetActiveHandle();
 
 	if (activeHandle->GetSynced() || !activeHandle->GetFullRead()) {
@@ -1270,7 +1272,8 @@ int LuaUnsyncedCtrl::AddMapLight(lua_State* L) {
 	return 1;
 }
 
-int LuaUnsyncedCtrl::AddModelLight(lua_State* L) {
+int LuaUnsyncedCtrl::AddModelLight(lua_State* L)
+{
 	const CLuaHandle* activeHandle = CLuaHandle::GetActiveHandle();
 
 	if (activeHandle->GetSynced() || !activeHandle->GetFullRead()) {
@@ -1296,7 +1299,8 @@ int LuaUnsyncedCtrl::AddModelLight(lua_State* L) {
 }
 
 
-int LuaUnsyncedCtrl::UpdateMapLight(lua_State* L) {
+int LuaUnsyncedCtrl::UpdateMapLight(lua_State* L)
+{
 	const CLuaHandle* activeHandle = CLuaHandle::GetActiveHandle();
 
 	if (activeHandle->GetSynced() || !activeHandle->GetFullRead()) {
@@ -1324,7 +1328,8 @@ int LuaUnsyncedCtrl::UpdateMapLight(lua_State* L) {
 	return 1;
 }
 
-int LuaUnsyncedCtrl::UpdateModelLight(lua_State* L) {
+int LuaUnsyncedCtrl::UpdateModelLight(lua_State* L)
+{
 	const CLuaHandle* activeHandle = CLuaHandle::GetActiveHandle();
 
 	if (activeHandle->GetSynced() || !activeHandle->GetFullRead()) {
@@ -1353,7 +1358,8 @@ int LuaUnsyncedCtrl::UpdateModelLight(lua_State* L) {
 }
 
 
-static bool AddLightTrackingTarget(lua_State* L, GL::Light* light, bool trackEnable, bool trackUnit) {
+static bool AddLightTrackingTarget(lua_State* L, GL::Light* light, bool trackEnable, bool trackUnit)
+{
 	bool ret = false;
 
 	if (trackUnit) {
@@ -1407,7 +1413,8 @@ static bool AddLightTrackingTarget(lua_State* L, GL::Light* light, bool trackEna
 
 // set a map-illuminating light to start/stop tracking
 // the position of a moving object (unit or projectile)
-int LuaUnsyncedCtrl::SetMapLightTrackingState(lua_State* L) {
+int LuaUnsyncedCtrl::SetMapLightTrackingState(lua_State* L)
+{
 	const CLuaHandle* activeHandle = CLuaHandle::GetActiveHandle();
 
 	if (activeHandle->GetSynced() || !activeHandle->GetFullRead()) {
@@ -1432,7 +1439,8 @@ int LuaUnsyncedCtrl::SetMapLightTrackingState(lua_State* L) {
 
 // set a model-illuminating light to start/stop tracking
 // the position of a moving object (unit or projectile)
-int LuaUnsyncedCtrl::SetModelLightTrackingState(lua_State* L) {
+int LuaUnsyncedCtrl::SetModelLightTrackingState(lua_State* L)
+{
 	const CLuaHandle* activeHandle = CLuaHandle::GetActiveHandle();
 
 	if (activeHandle->GetSynced() || !activeHandle->GetFullRead()) {

@@ -570,7 +570,7 @@ int LuaUnsyncedCtrl::LoadSoundDef(lua_State* L)
 	const string soundFile = lua_tostring(L, 1);
 	bool success = sound->LoadSoundDefs(soundFile);
 
-	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
+	if (!CLuaHandle::GetActiveHandle()->GetSynced()) {
 		lua_pushboolean(L, success);
 		return 1;
 	} else {
@@ -651,7 +651,7 @@ int LuaUnsyncedCtrl::PlaySoundFile(lua_State* L)
 		success = true;
 	}
 
-	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
+	if (!CLuaHandle::GetActiveHandle()->GetSynced()) {
 		lua_pushboolean(L, success);
 		return 1;
 	} else {
@@ -674,7 +674,7 @@ int LuaUnsyncedCtrl::PlaySoundStream(lua_State* L)
 
 	// .ogg files don't have sound ID's generated
 	// for them (yet), so we always succeed here
-	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
+	if (!CLuaHandle::GetActiveHandle()->GetSynced()) {
 		lua_pushboolean(L, true);
 		return 1;
 	} else {
@@ -854,7 +854,7 @@ int LuaUnsyncedCtrl::SetCameraState(lua_State* L)
 	lua_pushboolean(L, camHandler->SetState(camState));
 	camHandler->CameraTransition(camTime);
 
-	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
+	if (!CLuaHandle::GetActiveHandle()->GetSynced()) {
 		return 1;
 	} else {
 		return 0;
@@ -966,7 +966,7 @@ int LuaUnsyncedCtrl::AssignMouseCursor(lua_State* L)
 
 	const bool worked = mouse->AssignMouseCursor(cmdName, fileName, hotSpot, overwrite);
 
-	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
+	if (!CLuaHandle::GetActiveHandle()->GetSynced()) {
 		lua_pushboolean(L, worked);
 		return 1;
 	}
@@ -994,7 +994,7 @@ int LuaUnsyncedCtrl::ReplaceMouseCursor(lua_State* L)
 
 	const bool worked = mouse->ReplaceMouseCursor(oldName, newName, hotSpot);
 
-	if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
+	if (!CLuaHandle::GetActiveHandle()->GetSynced()) {
 		lua_pushboolean(L, worked);
 		return 1;
 	}
@@ -1470,6 +1470,7 @@ int LuaUnsyncedCtrl::SetUnitNoDraw(lua_State* L)
 	const int args = lua_gettop(L); // number of arguments
 	if ((args < 2) || !lua_isboolean(L, 2)) {
 		luaL_error(L, "Incorrect arguments to SetUnitNoDraw()");
+		return 0;
 	}
 	unit->noDraw = lua_toboolean(L, 2);
 	return 0;
@@ -1488,6 +1489,7 @@ int LuaUnsyncedCtrl::SetUnitNoMinimap(lua_State* L)
 	const int args = lua_gettop(L); // number of arguments
 	if ((args < 2) || !lua_isboolean(L, 2)) {
 		luaL_error(L, "Incorrect arguments to SetUnitNoMinimap()");
+		return 0;
 	}
 	unit->noMinimap = lua_toboolean(L, 2);
 	return 0;
@@ -1508,6 +1510,7 @@ int LuaUnsyncedCtrl::SetUnitNoSelect(lua_State* L)
 	const int args = lua_gettop(L); // number of arguments
 	if ((args < 2) || !lua_isboolean(L, 2)) {
 		luaL_error(L, "Incorrect arguments to SetUnitNoSelect()");
+		return 0;
 	}
 	unit->noSelect = lua_toboolean(L, 2);
 
@@ -1526,7 +1529,7 @@ int LuaUnsyncedCtrl::SetUnitNoSelect(lua_State* L)
 
 int LuaUnsyncedCtrl::AddUnitIcon(lua_State* L)
 {
-	if (!CLuaHandle::GetActiveHandle()->GetUserMode()) {
+	if (CLuaHandle::GetActiveHandle()->GetSynced()) {
 		return 0;
 	}
 	const string iconName  = luaL_checkstring(L, 1);
@@ -1542,7 +1545,7 @@ int LuaUnsyncedCtrl::AddUnitIcon(lua_State* L)
 
 int LuaUnsyncedCtrl::FreeUnitIcon(lua_State* L)
 {
-	if (!CLuaHandle::GetActiveHandle()->GetUserMode()) {
+	if (CLuaHandle::GetActiveHandle()->GetSynced()) {
 		return 0;
 	}
 	const string iconName  = luaL_checkstring(L, 1);

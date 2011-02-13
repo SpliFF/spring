@@ -9,6 +9,7 @@
 #include <string>
 #include <map>
 #include "Rendering/GL/myGL.h"
+#include "Rendering/GL/LightHandler.h"
 #include "System/EventClient.h"
 #include "lib/gml/ThreadSafeContainers.h"
 
@@ -47,7 +48,7 @@ public:
 	void DrawCloakedUnits(bool noAdvShading = false);
 	void DrawShadowPass();
 
-	void ApplyUnitTransformMatrix(CUnit* unit);
+	static void ApplyUnitTransformMatrix(const CUnit* unit);
 	void DrawUnitRaw(CUnit* unit);
 	void DrawUnitRawModel(CUnit* unit);
 	void DrawUnitWithLists(CUnit* unit, unsigned int preList, unsigned int postList);
@@ -97,7 +98,6 @@ public:
 
 	float3 unitAmbientColor;
 	float3 unitSunColor;
-	float unitShadowDensity;
 
 	struct TempDrawUnit {
 		const UnitDef* unitdef;
@@ -112,6 +112,7 @@ public:
 
 	float3 camNorm; ///< used to draw far-textures
 
+	void UpdateSunDir();
 	void CreateSpecularFace(unsigned int glType, int size, float3 baseDir, float3 xDif, float3 yDif, float3 sunDir, float exponent, float3 sunColor);
 
 	void DrawBuildingSample(const UnitDef* unitdef, int side, float3 pos, int facing = 0);
@@ -123,9 +124,15 @@ public:
 	/** CGame::DrawDirectControlHud,  **/
 	void DrawIndividual(CUnit* unit);
 
+	unsigned int CalcUnitLOD(const CUnit* unit, unsigned int lastLOD) const;
+	unsigned int CalcUnitShadowLOD(const CUnit* unit, unsigned int lastLOD) const;
+	void SetUnitLODCount(CUnit* unit, unsigned int count);
+
 	const std::set<CUnit*>& GetUnsortedUnits() const { return unsortedUnits; }
 	IWorldObjectModelRenderer* GetOpaqueModelRenderer(int modelType) { return opaqueModelRenderers[modelType]; }
 	IWorldObjectModelRenderer* GetCloakedModelRenderer(int modelType) { return cloakedModelRenderers[modelType]; }
+
+	GL::LightHandler* GetLightHandler() { return &lightHandler; }
 
 #ifdef USE_GML
 	int multiThreadDrawUnit;
@@ -167,7 +174,6 @@ private:
 	void DrawUnitIcons(bool drawReflection);
 
 	// note: make these static?
-	inline void DrawUnitDebug(CUnit* unit);
 	void DrawUnitBeingBuilt(CUnit* unit);
 	inline void DrawUnitModel(CUnit* unit);
 	void DrawUnitNow(CUnit* unit);
@@ -222,6 +228,8 @@ private:
 #endif
 
 	std::vector<std::set<CUnit*> > unitRadarIcons;
+
+	GL::LightHandler lightHandler;
 };
 
 extern CUnitDrawer* unitDrawer;

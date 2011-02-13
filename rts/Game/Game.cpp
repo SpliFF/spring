@@ -47,6 +47,7 @@
 #include "Rendering/Env/BaseTreeDrawer.h"
 #include "Rendering/Env/BaseWater.h"
 #include "Rendering/Env/CubeMapHandler.h"
+#include "Rendering/DebugColVolDrawer.h"
 #include "Rendering/FarTextureHandler.h"
 #include "Rendering/glFont.h"
 #include "Rendering/Screenshot.h"
@@ -102,8 +103,8 @@
 #include "Sim/Projectiles/ExplosionGenerator.h"
 #include "Sim/Projectiles/Projectile.h"
 #include "Sim/Projectiles/ProjectileHandler.h"
-#include "Sim/Units/COB/CobEngine.h"
-#include "Sim/Units/COB/UnitScriptEngine.h"
+#include "Sim/Units/Scripts/CobEngine.h"
+#include "Sim/Units/Scripts/UnitScriptEngine.h"
 #include "Sim/Units/UnitDefHandler.h"
 #include "Sim/Units/CommandAI/LineDrawer.h"
 #include "Sim/Units/Groups/GroupHandler.h"
@@ -547,7 +548,10 @@ void CGame::LoadRendering()
 	loadscreen->SetLoadMessage("Creating Sky & Water");
 	sky = CBaseSky::GetSky();
 	water = CBaseWater::GetWater(NULL, -1);
+}
 
+void CGame::SetupRenderingParams()
+{
 	glLightfv(GL_LIGHT1, GL_AMBIENT, mapInfo->light.unitAmbientColor);
 	glLightfv(GL_LIGHT1, GL_DIFFUSE, mapInfo->light.unitSunColor);
 	glLightfv(GL_LIGHT1, GL_SPECULAR, mapInfo->light.unitAmbientColor);
@@ -1050,11 +1054,10 @@ bool CGame::DrawWorld()
 
 	if (globalRendering->drawWater && !mapInfo->map.voidWater) {
 		SCOPED_TIMER("Water");
-		GML_STDMUTEX_LOCK(water);
 
 		water->OcclusionQuery();
 		if (water->drawSolid) {
-			water->UpdateWater(this);
+			water->UpdateBaseWater(this);
 			water->Draw();
 		}
 	}
@@ -1062,6 +1065,7 @@ bool CGame::DrawWorld()
 	selectedUnits.Draw();
 	eventHandler.DrawWorldPreUnit();
 
+	DebugColVolDrawer::Draw();
 	unitDrawer->Draw(false);
 	modelDrawer->Draw();
 	featureDrawer->Draw();
@@ -1071,7 +1075,7 @@ bool CGame::DrawWorld()
 	glEnable(GL_BLEND);
 	glDepthFunc(GL_LEQUAL);
 
-	bool noAdvShading = shadowHandler->drawShadows;
+	const bool noAdvShading = shadowHandler->shadowsLoaded;
 
 	static const double plane_below[4] = {0.0f, -1.0f, 0.0f, 0.0f};
 	static const double plane_above[4] = {0.0f,  1.0f, 0.0f, 0.0f};
@@ -1088,10 +1092,9 @@ bool CGame::DrawWorld()
 	//! draw water
 	if (globalRendering->drawWater && !mapInfo->map.voidWater) {
 		SCOPED_TIMER("Water");
-		GML_STDMUTEX_LOCK(water);
 
 		if (!water->drawSolid) {
-			water->UpdateWater(this);
+			water->UpdateBaseWater(this);
 			water->Draw();
 		}
 	}
@@ -1179,7 +1182,7 @@ bool CGame::DrawWorld()
 	glLoadIdentity();
 
 	glEnable(GL_BLEND);
-	glDisable(GL_DEPTH_TEST );
+	glDisable(GL_DEPTH_TEST);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	// underwater overlay, part 2
@@ -1270,8 +1273,8 @@ bool CGame::Draw() {
 			projectileDrawer->UpdateTextures();
 			sky->Update();
 
-			GML_STDMUTEX_LOCK(water);
 			water->Update();
+			globalRendering->Update();
 		}
 	}
 
@@ -1348,15 +1351,17 @@ bool CGame::Draw() {
 	if (doDrawWorld) {
 		{
 			SCOPED_TIMER("Shadows/Reflections");
-			if (shadowHandler->drawShadows &&
-				(gd->drawMode != CBaseGroundDrawer::drawLos)) {
+			if (shadowHandler->shadowsLoaded && (gd->drawMode != CBaseGroundDrawer::drawLos)) {
 				// NOTE: shadows don't work in LOS mode, gain a few fps (until it's fixed)
 				SetDrawMode(gameShadowDraw);
 				shadowHandler->CreateShadows();
 				SetDrawMode(gameNormalDraw);
 			}
 
+			cubeMapHandler->UpdateSpecularTexture();
 			cubeMapHandler->UpdateReflectionTexture();
+			sky->UpdateSkyTexture();
+
 
 			if (FBO::IsSupported())
 				FBO::Unbind();
@@ -1770,6 +1775,7 @@ void CGame::SimFrame() {
 			(playerHandler->Player(gu->myPlayerNum)->dccs).SendStateUpdate(camMove);
 		}
 		CTeamHighlight::Update(gs->frameNum);
+		globalRendering->UpdateSun();
 	}
 
 	// everything from here is simulation
@@ -1904,12 +1910,10 @@ void CGame::UpdateUI(bool updateCam)
 				userInput = userInput.substr(0, 200);
 				writingPos = (int)userInput.length();
 			}
-			inMapDrawer->SendPoint(inMapDrawer->waitingPoint, userInput, false);
-			inMapDrawer->wantLabel = false;
+			inMapDrawer->SendWaitingInput(userInput);
 			userInput = "";
 			writingPos = 0;
 			ignoreChar = 0;
-			inMapDrawer->keyPressed = false;
 		}
 	}
 }

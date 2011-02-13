@@ -332,7 +332,7 @@ void CDynWater::Draw()
 	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,6, 0.05f, 1-0.05f, 0, 0);
 	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,7, 0.2f, 0, 0, 0);
 	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,8, 0.5f, 0.6f, 0.8f, 0);
-	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,9, mapInfo->light.sunDir.x, mapInfo->light.sunDir.y, mapInfo->light.sunDir.z, 0);
+	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,9, globalRendering->sunDir.x, globalRendering->sunDir.y, globalRendering->sunDir.z, 0);
 	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,10, mapInfo->light.groundSunColor.x, mapInfo->light.groundSunColor.y, mapInfo->light.groundSunColor.z, 0);
 	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,11, mapInfo->light.groundAmbientColor.x, mapInfo->light.groundAmbientColor.y, mapInfo->light.groundAmbientColor.z, 0);
 	glProgramEnvParameter4fARB(GL_FRAGMENT_PROGRAM_ARB,12, refractRight.x,refractRight.y,refractRight.z,0);
@@ -447,24 +447,26 @@ void CDynWater::DrawReflection(CGame* game)
 
 	sky->Draw();
 
+	static const double plane[4] = {0.0, 1.0, 0.0, 1.0};
+	static const double plane2[4] = {0.0, -1.0, 0, 1.0};
+	const bool shadowsLoaded = shadowHandler->shadowsLoaded;
+
 	glEnable(GL_CLIP_PLANE2);
-	double plane2[4]={0,-1,0,1.0f};
-	glClipPlane(GL_CLIP_PLANE2 ,plane2);
-	drawReflection=true;
-	bool drawShadows=shadowHandler->drawShadows;
-	shadowHandler->drawShadows=false;
+	glClipPlane(GL_CLIP_PLANE2, plane2);
+
+	drawReflection = true;
+	shadowHandler->shadowsLoaded = false;
 
 	CBaseGroundDrawer* gd = readmap->GetGroundDrawer();
 		gd->SetupReflDrawPass();
 		gd->Draw(true, false);
 		gd->SetupBaseDrawPass();
 
-	double plane[4]={0,1,0,1.0f};
 	glClipPlane(GL_CLIP_PLANE2 ,plane);
 
 	gd->Draw(true);
 
-	shadowHandler->drawShadows=drawShadows;
+	shadowHandler->shadowsLoaded = shadowsLoaded;
 
 	unitDrawer->Draw(true);
 	featureDrawer->Draw();

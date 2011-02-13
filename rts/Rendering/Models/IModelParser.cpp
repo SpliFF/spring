@@ -16,7 +16,6 @@
 #include "assimp.hpp"
 #include "Sim/Misc/CollisionVolume.h"
 #include "Sim/Units/Unit.h"
-#include "Sim/Units/COB/CobInstance.h"
 #include "System/FileSystem/FileSystem.h"
 #include "System/Util.h"
 #include "System/LogOutput.h"

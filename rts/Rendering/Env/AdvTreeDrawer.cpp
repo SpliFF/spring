@@ -134,7 +134,7 @@ void CAdvTreeDrawer::LoadTreeShaders() {
 		treeShaders[TREE_PROGRAM_NEAR_SHADOW] = shaderHandler->CreateProgramObject("[TreeDrawer]", shaderNames[TREE_PROGRAM_NEAR_SHADOW] + "GLSL", false);
 		treeShaders[TREE_PROGRAM_DIST_SHADOW] = shaderHandler->CreateProgramObject("[TreeDrawer]", shaderNames[TREE_PROGRAM_DIST_SHADOW] + "GLSL", false);
 
-		if (shadowHandler->canUseShadows) {
+		if (shadowHandler->shadowsSupported) {
 			treeShaders[TREE_PROGRAM_NEAR_SHADOW]->AttachShaderObject(
 				shaderHandler->CreateShaderObject("GLSL/TreeVertProg.glsl", shaderDefines[TREE_PROGRAM_NEAR_SHADOW], GL_VERTEX_SHADER)
 			);
@@ -181,14 +181,14 @@ void CAdvTreeDrawer::LoadTreeShaders() {
 		treeShaders[TREE_PROGRAM_NEAR_SHADOW]->Enable();
 		treeShaders[TREE_PROGRAM_NEAR_SHADOW]->SetUniform3fv(3, &mapInfo->light.groundAmbientColor[0]);
 		treeShaders[TREE_PROGRAM_NEAR_SHADOW]->SetUniform3fv(4, &mapInfo->light.groundSunColor[0]);
-		treeShaders[TREE_PROGRAM_NEAR_SHADOW]->SetUniform1f(9, 1.0f - (mapInfo->light.groundShadowDensity * 0.5f));
+		treeShaders[TREE_PROGRAM_NEAR_SHADOW]->SetUniform1f(9, 1.0f - (globalRendering->groundShadowDensity * 0.5f));
 		treeShaders[TREE_PROGRAM_NEAR_SHADOW]->SetUniform1i(10, 0);
 		treeShaders[TREE_PROGRAM_NEAR_SHADOW]->SetUniform1i(11, 1);
 		treeShaders[TREE_PROGRAM_NEAR_SHADOW]->Disable();
 
 		treeShaders[TREE_PROGRAM_DIST_SHADOW]->Enable();
 		treeShaders[TREE_PROGRAM_DIST_SHADOW]->SetUniform3fv(3, &mapInfo->light.groundAmbientColor[0]);
-		treeShaders[TREE_PROGRAM_DIST_SHADOW]->SetUniform1f(9, 1.0f - (mapInfo->light.groundShadowDensity * 0.5f));
+		treeShaders[TREE_PROGRAM_DIST_SHADOW]->SetUniform1f(9, 1.0f - (globalRendering->groundShadowDensity * 0.5f));
 		treeShaders[TREE_PROGRAM_DIST_SHADOW]->SetUniform1i(10, 0);
 		treeShaders[TREE_PROGRAM_DIST_SHADOW]->SetUniform1i(11, 1);
 		treeShaders[TREE_PROGRAM_DIST_SHADOW]->Disable();
@@ -197,7 +197,7 @@ void CAdvTreeDrawer::LoadTreeShaders() {
 		treeShaders[TREE_PROGRAM_NEAR_BASIC]->AttachShaderObject(shaderHandler->CreateShaderObject("ARB/treeNS.vp", "", GL_VERTEX_PROGRAM_ARB));
 		treeShaders[TREE_PROGRAM_NEAR_BASIC]->Link();
 
-		if (shadowHandler->canUseShadows) {
+		if (shadowHandler->shadowsSupported) {
 			treeShaders[TREE_PROGRAM_NEAR_SHADOW] = shaderHandler->CreateProgramObject("[TreeDrawer]", shaderNames[TREE_PROGRAM_NEAR_SHADOW] + "ARB", true);
 			treeShaders[TREE_PROGRAM_NEAR_SHADOW]->AttachShaderObject(shaderHandler->CreateShaderObject("ARB/tree.vp", "", GL_VERTEX_PROGRAM_ARB));
 			treeShaders[TREE_PROGRAM_NEAR_SHADOW]->AttachShaderObject(shaderHandler->CreateShaderObject("ARB/treeFPshadow.fp", "", GL_FRAGMENT_PROGRAM_ARB));
@@ -449,7 +449,7 @@ void CAdvTreeDrawer::Draw(float treeDistance, bool drawReflection)
 	}
 
 
-	if (shadowHandler->drawShadows && !gd->DrawExtraTex()) {
+	if (shadowHandler->shadowsLoaded && !gd->DrawExtraTex()) {
 		glActiveTexture(GL_TEXTURE1);
 		glBindTexture(GL_TEXTURE_2D, activeFarTex);
 		glActiveTexture(GL_TEXTURE0);
@@ -467,7 +467,7 @@ void CAdvTreeDrawer::Draw(float treeDistance, bool drawReflection)
 		} else {
 			treeShader->SetUniformTarget(GL_FRAGMENT_PROGRAM_ARB);
 			treeShader->SetUniform4f(10, L.groundAmbientColor.x, L.groundAmbientColor.y, L.groundAmbientColor.z, 1.0f);
-			treeShader->SetUniform4f(11, 0.0f, 0.0f, 0.0f, 1.0f - (L.groundShadowDensity * 0.5f));
+			treeShader->SetUniform4f(11, 0.0f, 0.0f, 0.0f, 1.0f - (globalRendering->groundShadowDensity * 0.5f));
 			treeShader->SetUniformTarget(GL_VERTEX_PROGRAM_ARB);
 
 			glMatrixMode(GL_MATRIX0_ARB);
@@ -499,7 +499,7 @@ void CAdvTreeDrawer::Draw(float treeDistance, bool drawReflection)
 		const int ystart = std::max(                              0, cy - 2);
 		const int yend   = std::min(gs->mapy / TREE_SQUARE_SIZE - 1, cy + 2);
 
-		if (shadowHandler->drawShadows && !gd->DrawExtraTex()) {
+		if (shadowHandler->shadowsLoaded && !gd->DrawExtraTex()) {
 			treeShader->Disable();
 			treeShader = treeShaders[TREE_PROGRAM_NEAR_SHADOW];
 			treeShader->Enable();
@@ -646,7 +646,7 @@ void CAdvTreeDrawer::Draw(float treeDistance, bool drawReflection)
 		}
 
 
-		if (shadowHandler->drawShadows && !gd->DrawExtraTex()) {
+		if (shadowHandler->shadowsLoaded && !gd->DrawExtraTex()) {
 			treeShader->Disable();
 			treeShader = treeShaders[TREE_PROGRAM_DIST_SHADOW];
 			treeShader->Enable();
@@ -676,7 +676,7 @@ void CAdvTreeDrawer::Draw(float treeDistance, bool drawReflection)
 		}
 	}
 
-	if (shadowHandler->drawShadows && !gd->DrawExtraTex()) {
+	if (shadowHandler->shadowsLoaded && !gd->DrawExtraTex()) {
 		treeShader->Disable();
 
 		glActiveTexture(GL_TEXTURE1);

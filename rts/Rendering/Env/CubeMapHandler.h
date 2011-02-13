@@ -13,6 +13,7 @@ public:
 	void Free();
 
 	void UpdateReflectionTexture();
+	void UpdateSpecularTexture();
 
 	unsigned int GetEnvReflectionTextureID() const { return envReflectionTexID; }
 	unsigned int GetSkyReflectionTextureID() const { return skyReflectionTexID; }
@@ -22,7 +23,9 @@ public:
 
 private:
 	void CreateReflectionFace(unsigned int, const float3&, bool);
-	void CreateSpecularFace(unsigned int, int, const float3&, const float3&, const float3&, float);
+	inline void CreateSpecularFacePart(unsigned int, unsigned int, const float3&, const float3&, const float3&, unsigned int, unsigned char*);
+	void CreateSpecularFace(unsigned int, unsigned int, const float3&, const float3&, const float3&);
+	void UpdateSpecularFace(unsigned int, unsigned int, const float3&, const float3&, const float3&, unsigned int, unsigned char*);
 
 	unsigned int envReflectionTexID; // sky and map
 	unsigned int skyReflectionTexID; // sky only
@@ -32,11 +35,15 @@ private:
 	unsigned int specTexSize;
 
 	unsigned int currReflectionFace;
+	unsigned int currSpecularTexRow;
 	bool mapSkyReflections;
+
+	float specExp;
+	unsigned char* specTexBuf;
 
 	FBO reflectionCubeFBO;
 };
 
-extern CubeMapHandler *cubeMapHandler;
+extern CubeMapHandler* cubeMapHandler;
 
 #endif

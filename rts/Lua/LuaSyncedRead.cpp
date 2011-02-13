@@ -57,7 +57,7 @@
 #include "Sim/Units/UnitHandler.h"
 #include "Sim/Units/UnitDefHandler.h"
 #include "Sim/Units/UnitLoader.h"
-#include "Sim/Units/COB/CobInstance.h"
+#include "Sim/Units/Scripts/CobInstance.h"
 #include "Sim/Units/UnitTypes/Builder.h"
 #include "Sim/Units/UnitTypes/Factory.h"
 #include "Sim/Units/UnitTypes/TransportUnit.h"
@@ -1324,12 +1324,7 @@ int LuaSyncedRead::GetPlayerInfo(lua_State* L)
 		return 0;
 	}
 
-	// no player names for synchronized scripts
-	if (CLuaHandle::GetActiveHandle()->GetSynced()) {
-		HSTR_PUSH(L, "SYNCED_NONAME");
-	} else {
-		lua_pushstring(L, player->name.c_str());
-	}
+	lua_pushstring(L, player->name.c_str());
 	lua_pushboolean(L, player->active);
 	lua_pushboolean(L, player->spectator);
 	lua_pushnumber(L, player->team);
@@ -2797,6 +2792,12 @@ int LuaSyncedRead::GetUnitVelocity(lua_State* L)
 	lua_pushnumber(L, unit->speed.x);
 	lua_pushnumber(L, unit->speed.y);
 	lua_pushnumber(L, unit->speed.z);
+
+	if (lua_isboolean(L, 1) && lua_toboolean(L, 1)) {
+		lua_pushnumber(L, unit->speed.Length());
+		return 4;
+	}
+
 	return 3;
 }
 
@@ -4229,7 +4230,13 @@ int LuaSyncedRead::GetFeatureResurrect(lua_State* L)
 	if (feature == NULL) {
 		return 0;
 	}
-	lua_pushstring(L, feature->createdFromUnit.c_str());
+
+	if (feature->udef == NULL) {
+		lua_pushstring(L, "");
+	} else {
+		lua_pushstring(L, feature->udef->name.c_str());
+	}
+
 	lua_pushnumber(L, feature->buildFacing);
 	return 2;
 }

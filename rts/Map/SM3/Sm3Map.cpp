@@ -11,6 +11,7 @@
 #include "Game/LoadScreen.h"
 #include "Map/MapInfo.h"
 #include "Map/MapParser.h"
+#include "Rendering/GlobalRendering.h"
 #include "Rendering/ShadowHandler.h"
 #include "Rendering/GL/myGL.h"
 #include "System/ConfigHandler.h"
@@ -119,7 +120,7 @@ void CSm3ReadMap::NewGroundDrawer() {
 	}
 
 	renderer->config.useStaticShadow = false;
-	renderer->config.useShadowMaps = shadowHandler->drawShadows;
+	renderer->config.useShadowMaps = shadowHandler->shadowsLoaded;
 	renderer->config.terrainNormalMaps = false;
 	renderer->config.normalMapLevel = 3;
 

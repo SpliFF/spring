@@ -30,8 +30,7 @@
 
 CShadowHandler* shadowHandler = 0;
 
-bool CShadowHandler::canUseShadows = false;
-bool CShadowHandler::useFPShadows  = false;
+bool CShadowHandler::shadowsSupported = false;
 bool CShadowHandler::firstInstance = true;
 
 
@@ -40,8 +39,8 @@ CShadowHandler::CShadowHandler(void)
 	const bool tmpFirstInstance = firstInstance;
 	firstInstance = false;
 
-	drawShadows   = false;
-	inShadowPass  = false;
+	shadowsLoaded = false;
+	inShadowPass = false;
 	shadowTexture = 0;
 	dummyColorTexture = 0;
 	drawTerrainShadow = true;
@@ -54,7 +53,7 @@ CShadowHandler::CShadowHandler(void)
 	x2 = 0.0f;
 	y2 = 0.0f;
 
-	if (!tmpFirstInstance && !canUseShadows) {
+	if (!tmpFirstInstance && !shadowsSupported) {
 		return;
 	}
 
@@ -93,7 +92,6 @@ CShadowHandler::CShadowHandler(void)
 		//      2. (!GLEW_ARB_shadow_ambient && GLEW_ARB_shadow)
 		// but the non-FP result isn't nice anyway so just always
 		// use the program if we are guaranteed of shadow support
-		useFPShadows = true;
 
 		if (!GLEW_ARB_shadow_ambient) {
 			// can't use arbitrary texvals in case the depth comparison op fails (only 0)
@@ -106,7 +104,7 @@ CShadowHandler::CShadowHandler(void)
 	}
 
 	if (tmpFirstInstance) {
-		canUseShadows = true;
+		shadowsSupported = true;
 	}
 
 	if (configValue == 0) {
@@ -115,7 +113,7 @@ CShadowHandler::CShadowHandler(void)
 		shadowTexture = 0;
 		glDeleteTextures(1, &dummyColorTexture);
 		dummyColorTexture = 0;
-		return; // drawShadows is still false
+		return; // shadowsLoaded is still false
 	}
 
 	LoadShadowGenShaderProgs();
@@ -123,7 +121,7 @@ CShadowHandler::CShadowHandler(void)
 
 CShadowHandler::~CShadowHandler(void)
 {
-	if (drawShadows) {
+	if (shadowsLoaded) {
 		glDeleteTextures(1, &shadowTexture);
 		glDeleteTextures(1, &dummyColorTexture);
 	}
@@ -195,7 +193,7 @@ void CShadowHandler::LoadShadowGenShaderProgs()
 		}
 	}
 
-	drawShadows = true;
+	shadowsLoaded = true;
 	#undef sh
 }
 
@@ -322,8 +320,8 @@ void CShadowHandler::CreateShadows(void)
 	glLoadIdentity();
 
 
-	cross1 = (mapInfo->light.sunDir.cross(UpVector)).ANormalize();
-	cross2 = cross1.cross(mapInfo->light.sunDir);
+	cross1 = (globalRendering->sunDir.cross(UpVector)).ANormalize();
+	cross2 = cross1.cross(globalRendering->sunDir);
 	centerPos = camera->pos;
 
 	//! derive the size of the shadow-map from the
@@ -353,10 +351,10 @@ void CShadowHandler::CreateShadows(void)
 	shadowMatrix[ 5] =   cross2.y / maxLengthY;
 	shadowMatrix[ 9] =   cross2.z / maxLengthY;
 	shadowMatrix[13] = -(cross2.dot(centerPos)) / maxLengthY;
-	shadowMatrix[ 2] = -mapInfo->light.sunDir.x / maxLength;
-	shadowMatrix[ 6] = -mapInfo->light.sunDir.y / maxLength;
-	shadowMatrix[10] = -mapInfo->light.sunDir.z / maxLength;
-	shadowMatrix[14] = ((centerPos.x * mapInfo->light.sunDir.x + centerPos.z * mapInfo->light.sunDir.z) / maxLength) + 0.5f;
+	shadowMatrix[ 2] = -globalRendering->sunDir.x / maxLength;
+	shadowMatrix[ 6] = -globalRendering->sunDir.y / maxLength;
+	shadowMatrix[10] = -globalRendering->sunDir.z / maxLength;
+	shadowMatrix[14] = ((centerPos.x * globalRendering->sunDir.x + centerPos.z * globalRendering->sunDir.z) / maxLength) + 0.5f;
 
 	glLoadMatrixf(shadowMatrix.m);
 
@@ -380,9 +378,11 @@ void CShadowHandler::CreateShadows(void)
 	float3 oldup = camera->up;
 	camera->right = cross1;
 	camera->up = cross2;
-	camera->pos2 = camera->pos + mapInfo->light.sunDir * 8000;
+	camera->pos2 = camera->pos + globalRendering->sunDir * 8000;
 
-	DrawShadowPasses();
+
+	if(globalRendering->sunIntensity > 0)
+		DrawShadowPasses();
 
 	camera->up = oldup;
 	camera->pos2 = camera->pos;

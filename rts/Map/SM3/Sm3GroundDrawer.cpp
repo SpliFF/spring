@@ -29,7 +29,7 @@ CSm3GroundDrawer::CSm3GroundDrawer(CSm3ReadMap *m)
 
 	tr->config.detailMod = configHandler->Get("SM3TerrainDetail", 200) / 100.0f;
 
-	if (shadowHandler->canUseShadows) {
+	if (shadowHandler->shadowsSupported) {
 		shadowrc = tr->AddRenderContext(&shadowCam,false);
 	} else  {
 		shadowrc = 0;
@@ -75,9 +75,9 @@ void CSm3GroundDrawer::Draw(bool drawWaterReflection, bool drawUnitReflection)
 
 	terrain::RenderContext* currc = rc;
 
-	tr->SetShaderParams(mapInfo->light.sunDir, currc->cam->pos);
+	tr->SetShaderParams(globalRendering->sunDir, currc->cam->pos);
 
-	if (shadowHandler->drawShadows) {
+	if (shadowHandler->shadowsLoaded) {
 		terrain::ShadowMapParams params;
 
 		params.mid[0] = shadowHandler->GetShadowParams().x;
@@ -99,7 +99,7 @@ void CSm3GroundDrawer::Draw(bool drawWaterReflection, bool drawUnitReflection)
 
 	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
 	glEnable(GL_LIGHTING);
-	glLightfv(GL_LIGHT0, GL_POSITION, mapInfo->light.sunDir);
+	glLightfv(GL_LIGHT0, GL_POSITION, globalRendering->sunDir);
 
 	float d[4] = {0.0f, 0.0f, 0.0f, 1.0f};
 	const float z[] = {0.0f, 0.0f, 0.0f, 1.0f};

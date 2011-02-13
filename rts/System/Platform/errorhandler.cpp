@@ -13,6 +13,10 @@
 #include "System/LogOutput.h"
 #include "System/Util.h"
 
+#include <boost/bind.hpp>
+#include <boost/date_time/posix_time/posix_time.hpp>
+#include <boost/date_time/posix_time/ptime.hpp>
+
 #ifndef DEDICATED
 	#include "SpringApp.h"
 	#include "System/Platform/Threading.h"
@@ -22,35 +26,18 @@
 		#include <windows.h>
 		#else
 		// from X_MessageBox.cpp:
-		void X_MessageBox(const char *msg, const char *caption, unsigned int flags);
+		void X_MessageBox(const char* msg, const char* caption, unsigned int flags);
 		#endif
     #endif // ifndef HEADLESS
 #endif // ifndef DEDICATED
 
+volatile bool shutdownSucceeded = false;
 
 
-void ErrorMessageBox(const std::string& msg, const std::string& caption, unsigned int flags)
-{
-#ifndef DEDICATED
-	if (!(flags & MBF_MAIN)) {
-		Threading::Error err(caption, msg, flags);
-		Threading::SetThreadError(err);
-		if (!Threading::IsMainThread()) {
-			Threading::GetMainThread()->interrupt();
-		}
-		throw boost::thread_interrupted();
-	}
-#endif
-
-	//! exiting any possibly threads
-	//! (else they would still run while the error messagebox is shown)
-#ifdef DEDICATED
-	SafeDelete(gameServer);
-#else
-	SpringApp::Shutdown();
-#endif
-
+void ExitMessage(const std::string& msg, const std::string& caption, unsigned int flags, bool forced) {
 	logOutput.SetSubscribersEnabled(false);
+	if (forced)
+		LogObject() << "WARNING: failed to shutdown normally, exit forced";
 	LogObject() << caption << " " << msg;
 
 #if !defined(DEDICATED) && !defined(HEADLESS)
@@ -75,5 +62,55 @@ void ErrorMessageBox(const std::string& msg, const std::string& caption, unsigne
   #endif // ifdef WIN32
 #endif // if !defined(DEDICATED) && !defined(HEADLESS)
 
+#ifdef _MSC_VER
+	TerminateProcess(GetCurrentProcess(), -1);
+#else
 	exit(-1); // continuing execution when SDL_Quit has already been run will result in a crash
+#endif
+}
+
+
+void ForcedExit(const std::string& msg, const std::string& caption, unsigned int flags) {
+	for (unsigned int n = 0; !shutdownSucceeded && n < 50; ++n)
+		boost::this_thread::sleep(boost::posix_time::milliseconds(100));
+
+	if (!shutdownSucceeded)
+		ExitMessage(msg, caption, flags, true);
+}
+
+
+void ErrorMessageBox(const std::string& msg, const std::string& caption, unsigned int flags)
+{
+#ifndef DEDICATED
+	if (!(flags & MBF_MAIN)) {
+		Threading::Error err(caption, msg, flags);
+		Threading::SetThreadError(err);
+
+		boost::thread* mainthread = Threading::GetMainThread();
+		if (mainthread && !Threading::IsMainThread())
+			mainthread->interrupt();
+
+		boost::thread* loadthread = Threading::GetLoadingThread();
+		if (loadthread && Threading::IsMainThread())
+			loadthread->interrupt();
+
+		if (!(flags & MBF_CRASH) && Threading::IsLoadingThread())
+			throw boost::thread_interrupted(); // only the loading thread currently catches this interrupted exception (makes a more graceful exit)
+	}
+#endif
+
+	//! exiting any possibly threads
+	//! (else they would still run while the error messagebox is shown)
+#ifdef DEDICATED
+	SafeDelete(gameServer);
+#else
+	if (Threading::IsMainThread()) {
+		boost::thread forcedExitThread(boost::bind(&ForcedExit, msg, caption, flags));
+		SpringApp::Shutdown();
+		shutdownSucceeded = true;
+		forcedExitThread.join();
+	}
+#endif
+
+	ExitMessage(msg, caption, flags, false);
 }

@@ -10,9 +10,9 @@
 #include "UnitLoader.h"
 #include "UnitTypes/Building.h"
 #include "UnitTypes/TransportUnit.h"
-#include "COB/NullUnitScript.h"
-#include "COB/UnitScriptFactory.h"
-#include "COB/CobInstance.h" // for TAANG2RAD
+#include "Scripts/NullUnitScript.h"
+#include "Scripts/UnitScriptFactory.h"
+#include "Scripts/CobInstance.h" // for TAANG2RAD
 
 #include "CommandAI/CommandAI.h"
 #include "CommandAI/FactoryCAI.h"
@@ -24,7 +24,6 @@
 #include "CommandAI/TransportCAI.h"
 
 #include "ExternalAI/EngineOutHandler.h"
-#include "Game/Camera.h"
 #include "Game/GameHelper.h"
 #include "Game/GameSetup.h"
 #include "Game/Player.h"
@@ -95,7 +94,6 @@ CUnit::CUnit() : CSolidObject(),
 	rightdir(-1.0f, 0.0f, 0.0f),
 	updir(0.0f, 1.0f, 0.0f),
 	upright(true),
-	relMidPos(0.0f, 0.0f, 0.0f),
 	travel(0.0f),
 	travelPeriod(0.0f),
 	power(100.0f),
@@ -138,7 +136,6 @@ CUnit::CUnit() : CSolidObject(),
 	category(0),
 	los(NULL),
 	tempNum(0),
-	lastSlowUpdate(0),
 	losRadius(0),
 	airLosRadius(0),
 	losHeight(0.0f),
@@ -263,7 +260,7 @@ CUnit::~CUnit()
 		// to be as short as possible to prevent position jumps)
 		featureHandler->CreateWreckage(pos, wreckName, heading, buildFacing,
 		                               delayedWreckLevel, team, -1, true,
-		                               unitDefName, deathSpeed);
+		                               unitDef, deathSpeed);
 	}
 
 	if (unitDef->isAirBase) {
@@ -690,11 +687,6 @@ void CUnit::Update()
 
 	posErrorVector += posErrorDelta;
 
-	if (deathScriptFinished) {
-		uh->DeleteUnit(this);
-		return;
-	}
-
 	if (beingBuilt) {
 		return;
 	}
@@ -937,9 +929,6 @@ void CUnit::SlowUpdate()
 	}
 
 	// below is stuff that should not be run while being built
-
-	lastSlowUpdate=gs->frameNum;
-
 	commandAI->SlowUpdate();
 	moveType->SlowUpdate();
 
@@ -1385,12 +1374,12 @@ void CUnit::DoSeismicPing(float pingSize)
 }
 
 
-void CUnit::ChangeLos(int l, int airlos)
+void CUnit::ChangeLos(int losRad, int airRad)
 {
 	loshandler->FreeInstance(los);
 	los = NULL;
-	losRadius = l;
-	airLosRadius = airlos;
+	losRadius = losRad;
+	airLosRadius = airRad;
 	loshandler->MoveUnit(this, false);
 }
 
@@ -1467,14 +1456,12 @@ bool CUnit::ChangeTeam(int newteam, ChangeType type)
 
 	neutral = false;
 
-	loshandler->MoveUnit(this,false);
+	loshandler->MoveUnit(this, false);
 	losStatus[allyteam] = LOS_ALL_MASK_BITS |
 		LOS_INLOS | LOS_INRADAR | LOS_PREVLOS | LOS_CONTRADAR;
 
 	qf->MovedUnit(this);
 	radarhandler->MoveUnit(this);
-
-	SetLODCount(0);
 
 	if (unitDef->isAirBase) {
 		airBaseHandler->RegisterAirBase(this);
@@ -1859,7 +1846,7 @@ void CUnit::FinishedBuilding()
 		UnBlock();
 		CFeature* f =
 			featureHandler->CreateWreckage(pos, wreckName, heading, buildFacing,
-										   0, team, allyteam, false, "");
+										   0, team, allyteam, false, NULL);
 		if (f) {
 			f->blockHeightChanges = true;
 		}
@@ -2113,78 +2100,6 @@ void CUnit::ReleaseTempHoldFire()
 }
 
 
-/******************************************************************************/
-
-float CUnit::lodFactor = 1.0f;
-
-
-void CUnit::SetLODFactor(float value)
-{
-	lodFactor = (value * camera->lppScale);
-}
-
-
-void CUnit::SetLODCount(unsigned int count)
-{
-	const unsigned int oldCount = lodCount;
-
-	lodCount = count;
-
-	lodLengths.resize(count);
-	for (unsigned int i = oldCount; i < count; i++) {
-		lodLengths[i] = -1.0f;
-	}
-
-	localmodel->SetLODCount(count);
-
-	for (int m = 0; m < LUAMAT_TYPE_COUNT; m++) {
-		luaMats[m].SetLODCount(count);
-	}
-
-	return;
-}
-
-
-unsigned int CUnit::CalcLOD(unsigned int lastLOD) const
-{
-	if (lastLOD == 0) { return 0; }
-
-	const float3 diff = (pos - camera->pos);
-	const float dist = diff.dot(camera->forward);
-	const float lpp = std::max(0.0f, dist * lodFactor);
-	for (/* no-op */; lastLOD != 0; lastLOD--) {
-		if (lpp > lodLengths[lastLOD]) {
-			break;
-		}
-	}
-	return lastLOD;
-}
-
-
-unsigned int CUnit::CalcShadowLOD(unsigned int lastLOD) const
-{
-	return CalcLOD(lastLOD); // FIXME
-
-	// FIXME -- the more 'correct' method
-	if (lastLOD == 0) { return 0; }
-
-	// FIXME: fix it, cap it for shallow shadows?
-	const float3& sun = mapInfo->light.sunDir;
-	const float3 diff = (camera->pos - pos);
-	const float  dot  = diff.dot(sun);
-	const float3 gap  = diff - (sun * dot);
-	const float  lpp  = std::max(0.0f, gap.Length() * lodFactor);
-
-	for (/* no-op */; lastLOD != 0; lastLOD--) {
-		if (lpp > lodLengths[lastLOD]) {
-			break;
-		}
-	}
-	return lastLOD;
-}
-
-
-/******************************************************************************/
 
 void CUnit::PostLoad()
 {
@@ -2326,7 +2241,6 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(rightdir),
 	CR_MEMBER(updir),
 	CR_MEMBER(upright),
-	CR_MEMBER(relMidPos),
 	CR_MEMBER(deathSpeed),
 	CR_MEMBER(travel),
 	CR_MEMBER(travelPeriod),
@@ -2372,7 +2286,6 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(quads),
 	CR_MEMBER(los),
 	CR_MEMBER(tempNum),
-	CR_MEMBER(lastSlowUpdate),
 	CR_MEMBER(mapSquare),
 	CR_MEMBER(losRadius),
 	CR_MEMBER(airLosRadius),
@@ -2442,7 +2355,6 @@ CR_REG_METADATA(CUnit, (
 //#endif
 	//CR_MEMBER(model),
 	//CR_MEMBER(localmodel),
-	//CR_MEMBER(cob),
 	//CR_MEMBER(script),
 	CR_MEMBER(tooltip),
 	CR_MEMBER(crashing),
@@ -2488,14 +2400,10 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(maxSpeed),
 	CR_MEMBER(maxReverseSpeed),
 //	CR_MEMBER(weaponHitMod),
-//	CR_MEMBER(lodCount),
-//	CR_MEMBER(currentLOD),
-//	CR_MEMBER(lodLengths),
 //	CR_MEMBER(luaMats),
 	CR_MEMBER(alphaThreshold),
 	CR_MEMBER(cegDamage),
 //	CR_MEMBER(lastDrawFrame),
-//	CR_MEMBER(lodFactor), // unsynced
 //	CR_MEMBER(expMultiplier),
 //	CR_MEMBER(expPowerScale),
 //	CR_MEMBER(expHealthScale),

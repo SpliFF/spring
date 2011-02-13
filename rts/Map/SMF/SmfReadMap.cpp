@@ -69,7 +69,7 @@ CSmfReadMap::CSmfReadMap(std::string mapname): file(mapname)
 
 
 
-	haveSpecularLighting = (!(mapInfo->smf.specularTexName.empty()) && globalRendering->haveGLSL);
+	haveSpecularLighting = !(mapInfo->smf.specularTexName.empty());
 	haveSplatTexture = (!mapInfo->smf.splatDetailTexName.empty() && !mapInfo->smf.splatDistrTexName.empty());
 
 	CBitmap detailTexBM;
@@ -89,6 +89,7 @@ CSmfReadMap::CSmfReadMap(std::string mapname): file(mapname)
 		CBitmap skyReflectModTexBM;
 		if (!specularTexBM.Load(mapInfo->smf.specularTexName)) {
 			// maps wants specular lighting, but no moderation
+			specularTexBM.channels = 4;
 			specularTexBM.Alloc(1, 1);
 			specularTexBM.mem[0] = 255;
 			specularTexBM.mem[1] = 255;
@@ -105,6 +106,7 @@ CSmfReadMap::CSmfReadMap(std::string mapname): file(mapname)
 			// detail-splat blending, the regular detail-texture is not used
 			if (!splatDetailTexBM.Load(mapInfo->smf.splatDetailTexName)) {
 				// default detail-texture should be all-grey
+				splatDetailTexBM.channels = 4;
 				splatDetailTexBM.Alloc(1, 1);
 				splatDetailTexBM.mem[0] = 127;
 				splatDetailTexBM.mem[1] = 127;
@@ -113,6 +115,7 @@ CSmfReadMap::CSmfReadMap(std::string mapname): file(mapname)
 			}
 
 			if (!splatDistrTexBM.Load(mapInfo->smf.splatDistrTexName)) {
+				splatDistrTexBM.channels = 4;
 				splatDistrTexBM.Alloc(1, 1);
 				splatDistrTexBM.mem[0] = 255;
 				splatDistrTexBM.mem[1] = 0;
@@ -299,7 +302,7 @@ void CSmfReadMap::UpdateHeightmapUnsynced(int x1, int y1, int x2, int y2)
 	}
 
 
-	if (haveSpecularLighting) {
+	if (globalRendering->haveGLSL) {
 		// update the vertex normals
 		const float* hm = heightmap;
 

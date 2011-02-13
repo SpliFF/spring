@@ -39,7 +39,7 @@
 #include "Rendering/VerticalSync.h"
 #include "Lua/LuaOpenGL.h"
 #include "Sim/Misc/TeamHandler.h"
-#include "Sim/Units/COB/UnitScript.h"
+#include "Sim/Units/Scripts/UnitScript.h"
 #include "Sim/Units/Groups/GroupHandler.h"
 #include "Sim/Misc/SmoothHeightMesh.h"
 #include "UI/CommandColors.h"
@@ -120,7 +120,7 @@ bool CGame::ActionPressed(const Action& action,
 			logOutput.Print("Change your configuration and restart to use them");
 			return true;
 		}
-		else if (!shadowHandler->canUseShadows) {
+		else if (!shadowHandler->shadowsSupported) {
 			logOutput.Print("Your hardware/driver setup does not support shadows");
 			return true;
 		}
@@ -147,11 +147,10 @@ bool CGame::ActionPressed(const Action& action,
 		if (!action.extra.empty()) {
 			nextWaterRendererMode = std::max(0, atoi(action.extra.c_str()) % CBaseWater::NUM_WATER_RENDERERS);
 		} else {
-			nextWaterRendererMode = (std::max(0, water->GetID()) + 1) % CBaseWater::NUM_WATER_RENDERERS;
+			nextWaterRendererMode = -1;
 		}
 
-		water = CBaseWater::GetWater(water, nextWaterRendererMode);
-		logOutput.Print("Set water rendering mode to %i (%s)", nextWaterRendererMode, water->GetName());
+		CBaseWater::PushWaterMode(nextWaterRendererMode);
 	}
 	else if (cmd == "advshading") {
 		static bool canUse = unitDrawer->advShading;
@@ -729,6 +728,13 @@ bool CGame::ActionPressed(const Action& action,
 			sky->dynamicSky = !!atoi(action.extra.c_str());
 		}
 	}
+	else if (cmd == "dynamicsun") {
+		if (action.extra.empty()) {
+			globalRendering->dynamicSun = !globalRendering->dynamicSun;
+		} else {
+			globalRendering->dynamicSun = !!atoi(action.extra.c_str());
+		}
+	}
 #ifdef USE_GML
 	else if (cmd == "multithreaddrawground") {
 		if (action.extra.empty()) {
@@ -1176,11 +1182,14 @@ bool CGame::ActionPressed(const Action& action,
 	else if (cmd == "allmapmarks") {
 		if (gs->cheatEnabled) {
 			if (action.extra.empty()) {
-				inMapDrawer->ToggleAllVisible();
+				inMapDrawer->ToggleAllMarksVisible();
 			} else {
-				inMapDrawer->SetAllVisible(!!atoi(action.extra.c_str()));
+				inMapDrawer->SetAllMarksVisible(!!atoi(action.extra.c_str()));
 			}
 		}
+	}
+	else if (cmd == "clearmapmarks") {
+		inMapDrawer->ClearMarks();
 	}
 	else if (cmd == "noluadraw") {
 		if (action.extra.empty()) {

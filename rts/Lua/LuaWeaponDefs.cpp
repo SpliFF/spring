@@ -393,7 +393,7 @@ static int GuiSoundSetTable(lua_State* L, const void* data)
 		const GuiSoundSet::Data& sound = soundSet.sounds[i];
 		HSTR_PUSH_STRING(L, "name",   sound.name);
 		HSTR_PUSH_NUMBER(L, "volume", sound.volume);
-		if (CLuaHandle::GetActiveHandle()->GetUserMode()) {
+		if (!CLuaHandle::GetActiveHandle()->GetSynced()) {
 			HSTR_PUSH_NUMBER(L, "id", sound.id);
 		}
 		lua_rawset(L, -3);
@@ -483,7 +483,6 @@ static bool InitParamMap()
 	ADD_BOOL("onlyForward", wd.onlyForward);
 	ADD_BOOL("waterWeapon", wd.waterweapon);
 	ADD_BOOL("tracks", wd.tracks);
-	ADD_BOOL("dropped", wd.dropped);
 	ADD_BOOL("paralyzer", wd.paralyzer);
 
 	ADD_BOOL("noAutoTarget",   wd.noAutoTarget);

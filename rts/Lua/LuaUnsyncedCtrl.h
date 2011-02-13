@@ -61,6 +61,13 @@ class LuaUnsyncedCtrl {
 
 		static int SetWaterParams(lua_State* L);
 
+		static int AddMapLight(lua_State* L);
+		static int AddModelLight(lua_State* L);
+		static int UpdateMapLight(lua_State* L);
+		static int UpdateModelLight(lua_State* L);
+		static int SetMapLightTrackingState(lua_State* L);
+		static int SetModelLightTrackingState(lua_State* L);
+
 		static int SetUnitNoDraw(lua_State* L);
 		static int SetUnitNoMinimap(lua_State* L);
 		static int SetUnitNoSelect(lua_State* L);
@@ -129,6 +136,12 @@ class LuaUnsyncedCtrl {
 
 		static int SetBuildSpacing(lua_State* L);
 		static int SetBuildFacing(lua_State* L);
+
+		static int SetSunParameters(lua_State* L);
+		static int SetSunManualControl(lua_State* L);
+		static int SetSunDirection(lua_State* L);
+
+		static int ClearWatchDogTimer(lua_State* L);
 };
 
 

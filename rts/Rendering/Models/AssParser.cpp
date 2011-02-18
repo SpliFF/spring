@@ -145,7 +145,7 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
 
     S3DModel* model = new S3DModel;
     model->name = modelFileName;
-	model->type = MODELTYPE_ASS;
+	model->type = MODELTYPE_OTHER;
 	model->numPieces = 0;
     model->scene = scene;
     //model->meta = &metaTable;
@@ -177,7 +177,7 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
         }
     }
     model->flipTexY = metaTable.GetBool("fliptextures", true); // Flip texture upside down
-    model->invertAlpha = metaTable.GetBool("invertteamcolor", true); // Reverse teamcolor levels
+    model->invertTexAlpha = metaTable.GetBool("invertteamcolor", true); // Reverse teamcolor levels
 
     // Load textures
     logOutput.Print(LOG_MODEL, "Loading textures. Tex1: '%s' Tex2: '%s'", model->tex1.c_str(), model->tex2.c_str());
@@ -217,9 +217,9 @@ S3DModel* CAssParser::Load(const std::string& modelFileName)
 SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& metaTable)
 {
 	// Create new piece
-	model->numobjects++;
+	model->numPieces++;
 	SAssPiece* piece = new SAssPiece;
-	piece->type = MODELTYPE_ASS;
+	piece->type = MODELTYPE_OTHER;
 	piece->node = node;
 	piece->model = model;
 	piece->isEmpty = node->mNumMeshes == 0;
@@ -241,7 +241,7 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
  	aiQuaternion _rotate;
 	node->mTransformation.Decompose(_scale,_rotate,_offset);
 
-	logOutput.Print(LOG_PIECE, "(%d:%s) Assimp offset (%f,%f,%f), rotate (%f,%f,%f), scale (%f,%f,%f)", model->numobjects, piece->name.c_str(),
+	logOutput.Print(LOG_PIECE, "(%d:%s) Assimp offset (%f,%f,%f), rotate (%f,%f,%f), scale (%f,%f,%f)", model->numPieces, piece->name.c_str(),
 		_offset.x, _offset.y, _offset.z,
 		_rotate.x, _rotate.y, _rotate.z,
 		_scale.x, _scale.y, _scale.z
@@ -268,7 +268,7 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
     scale.y = pieceTable.GetFloat("scaley", scale.y);
     scale.z = pieceTable.GetFloat("scalez", scale.z);
 
-	logOutput.Print(LOG_PIECE, "(%d:%s) Relative offset (%f,%f,%f), rotate (%f,%f,%f), scale (%f,%f,%f)", model->numobjects, piece->name.c_str(),
+	logOutput.Print(LOG_PIECE, "(%d:%s) Relative offset (%f,%f,%f), rotate (%f,%f,%f), scale (%f,%f,%f)", model->numPieces, piece->name.c_str(),
 		offset.x, offset.y, offset.z,
 		rotate.x, rotate.y, rotate.z,
 		scale.x, scale.y, scale.z
@@ -375,14 +375,14 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
     if (strcmp(node->mName.data, "SpringHeight") == 0) {
         // Set the model height to this nodes Z value
         if (!metaTable.KeyExists("height")) {
-            model->height = piece->pos.z;
+            model->height = piece->offset.z;
             logOutput.Print (LOG_MODEL, "Model height of %f set by special node 'SpringHeight'", model->height);
         }
         return NULL;
     }
     if (strcmp(node->mName.data, "SpringRadius") == 0) {
         if (!metaTable.KeyExists("midpos")) {
-            model->relMidPos = float3(piece->pos.x, piece->pos.z, piece->pos.y); // Y and Z are swapped because this piece isn't rotated
+            model->relMidPos = float3(piece->offset.x, piece->offset.z, piece->offset.y); // Y and Z are swapped because this piece isn't rotated
             logOutput.Print (LOG_MODEL, "Model midpos of (%f,%f,%f) set by special node 'SpringRadius'", model->relMidPos.x, model->relMidPos.y, model->relMidPos.z);
         }
         if (!metaTable.KeyExists("radius")) {
@@ -398,7 +398,7 @@ SAssPiece* CAssParser::LoadPiece(S3DModel* model, aiNode* node, const LuaTable& 
 
 	// collision volume for piece (not sure about these coords)
 	const float3 cvScales = (piece->maxs) - (piece->mins);
-	const float3 cvOffset = (piece->maxs - piece->pos) + (piece->mins - piece->pos);
+	const float3 cvOffset = (piece->maxs - piece->offset) + (piece->mins - piece->offset);
 	//const float3 cvOffset(piece->offset.x, piece->offset.y, piece->offset.z);
 	piece->colvol = new CollisionVolume("box", cvScales, cvOffset, CollisionVolume::COLVOL_HITTEST_CONT);
 
@@ -463,7 +463,7 @@ void CAssParser::BuildPieceHierarchy( S3DModel* model )
 // Iterate over the model and calculate its overall dimensions
 void CAssParser::CalculateMinMax( S3DModelPiece* piece )
 {
-    piece->goffset = piece->parent ? piece->parent->goffset + piece->pos : piece->pos;
+    piece->goffset = piece->parent ? piece->parent->goffset + piece->offset : piece->offset;
 
 	// update model min/max extents
 	piece->model->mins.x = std::min(piece->goffset.x + piece->mins.x, piece->model->mins.x);

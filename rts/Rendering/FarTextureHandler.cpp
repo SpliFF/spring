@@ -135,7 +135,7 @@ void CFarTextureHandler::CreateFarTexture(const CSolidObject* obj)
 		}
 
 		if (texSizeY > globalRendering->maxTextureSize) {
-			//logOutput.Print("Out of farTextures"); 
+			//logOutput.Print("Out of farTextures");
 			texSizeY = oldTexSizeY;
 			return;
 		}
@@ -181,7 +181,7 @@ void CFarTextureHandler::CreateFarTexture(const CSolidObject* obj)
 	unitDrawer->SetupForUnitDrawing();
 	unitDrawer->GetOpaqueModelRenderer(model->type)->PushRenderState();
 
-	if (model->type == MODELTYPE_S3O || model->type == MODELTYPE_OBJ || model->type == MODELTYPE_ASS) {
+	if (model->type == MODELTYPE_S3O || model->type == MODELTYPE_ASS) {
 		// FIXME for some strange reason we need to invert the culling, why?
 		if (model->type == MODELTYPE_S3O) {
 			glCullFace(GL_FRONT);

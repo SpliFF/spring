@@ -40,11 +40,8 @@ S3DModel* CS3OParser::Load(const std::string& name)
 		model->numPieces = 0;
 		model->tex1 = (char*) &fileBuf[header.texture1];
 		model->tex2 = (char*) &fileBuf[header.texture2];
-		model->flipTexY = false;
-		model->invertAlpha = false;
 		model->mins = DEF_MIN_SIZE;
 		model->maxs = DEF_MAX_SIZE;
-
 	texturehandlerS3O->LoadS3OTexture(model);
 
 	SS3OPiece* rootPiece = LoadPiece(model, NULL, fileBuf, header.rootPiece);
@@ -74,8 +71,6 @@ SS3OPiece* CS3OParser::LoadPiece(S3DModel* model, SS3OPiece* parent, unsigned ch
 		piece->offset.x = fp->xoffset;
 		piece->offset.y = fp->yoffset;
 		piece->offset.z = fp->zoffset;
-		piece->rot = ZeroVector;
-		piece->scale = float3(1.0f, 1.0f, 1.0f);
 		piece->primitiveType = fp->primitiveType;
 		piece->name = (char*) &buf[fp->name];
 		piece->parent = parent;
@@ -108,7 +103,7 @@ SS3OPiece* CS3OParser::LoadPiece(S3DModel* model, SS3OPiece* parent, unsigned ch
 
 
 	piece->isEmpty = piece->vertexDrawOrder.empty();
-	piece->goffset = piece->pos + ((parent != NULL)? parent->goffset: ZeroVector);
+	piece->goffset = piece->offset + ((parent != NULL)? parent->goffset: ZeroVector);
 
 	piece->SetVertexTangents();
 	piece->SetMinMaxExtends();

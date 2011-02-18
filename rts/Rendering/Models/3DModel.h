@@ -15,7 +15,7 @@ const int
 	MODELTYPE_3DO   = 0,
 	MODELTYPE_S3O   = 1,
 	MODELTYPE_ASS	= 2, // Model loaded by Assimp library
-	MODELTYPE_OTHER	= 3; // For future use. Still used in some parts of code.
+	MODELTYPE_OTHER	= 3; // End of list, leave last
 
 struct CollisionVolume;
 struct S3DModel;
@@ -30,9 +30,13 @@ struct S3DModelPiece {
 	S3DModelPiece(): type(-1) {
 		parent = NULL;
 		colvol = NULL;
-
 		isEmpty = true;
 		dispListID = 0;
+        offset = float3(0.0f,0.0f,0.0f);
+        rot = float3(0.0f,0.0f,0.0f);
+        scale = float3(1.0f,1.0f,1.0f);
+        mins = float3(10000.0f,  10000.0f,  10000.0f);
+        maxs = float3(-10000.0f, -10000.0f, -10000.0f);
 	}
 
 	virtual ~S3DModelPiece();
@@ -78,13 +82,17 @@ struct S3DModel
 {
 	S3DModel(): id(-1), type(-1), textureType(-1) {
 		numPieces = 0;
-
-		radius = 0.0f;
-		height = 0.0f;
-
+        height = 0.0f;
+        radius = 0.0f;
+        relMidPos = float3(0.0f, 0.0f, 0.0f);
+        mins = float3(10000.0f,  10000.0f,  10000.0f);
+        maxs = float3(-10000.0f, -10000.0f, -10000.0f);
+        tex1 = "default.png";
+        tex2 = "";
+		flipTexY = false;
+		invertTexAlpha = false;
 		rootPiece = NULL;
 	}
-	~S3DModel();
 
 	S3DModelPiece* GetRootPiece() { return rootPiece; }
 	void SetRootPiece(S3DModelPiece* p) { rootPiece = p; }
@@ -98,7 +106,7 @@ struct S3DModel
 	// TODO: Move next 5 fields into S3DModelPiece for per-piece texturing
 	int textureType;        //! FIXME: MAKE S3O ONLY (0 = 3DO, otherwise S3O or Assimp)
 	int flipTexY;			//! Turn both textures upside down before use
-	int invertAlpha;		//! Invert teamcolor alpha channel in S3O texture 1
+	int invertTexAlpha;		//! Invert teamcolor alpha channel in S3O texture 1
 	std::string tex1;
 	std::string tex2;
 
@@ -150,6 +158,7 @@ struct LocalModelPiece
 
 	void SetCollisionVolume(CollisionVolume* cv) { colvol = cv; }
 	const CollisionVolume* GetCollisionVolume() const { return colvol; }
+	CollisionVolume* GetCollisionVolume() { return colvol; }
 
 	float3 pos;
 	float3 rot; 	//! in radian

@@ -311,7 +311,7 @@ void CUnitScript::AddAnim(AnimType type, int piece, int axis, float speed, float
 
 	float destf;
 	if (type == AMove) {
-		destf = pieces[piece]->original->pos[axis] + dest;
+		destf = pieces[piece]->original->offset[axis] + dest;
 	} else {
 		destf = dest;
 		if (type == ATurn) {
@@ -414,7 +414,7 @@ void CUnitScript::MoveNow(int piece, int axis, float destination)
 	}
 
 	LocalModelPiece* p = pieces[piece];
-	p->pos[axis] = pieces[piece]->original->pos[axis] + destination;
+	p->pos[axis] = pieces[piece]->original->offset[axis] + destination;
 }
 
 
@@ -794,7 +794,7 @@ void CUnitScript::MoveSmooth(int piece, int axis, float destination, int delta, 
 		}
 	}
 
-	float cur = pieces[piece]->pos[axis] - pieces[piece]->original->pos[axis];
+	float cur = pieces[piece]->pos[axis] - pieces[piece]->original->offset[axis];
 	float dist = streflop::fabsf(destination - cur);
 	int timeFactor = (1000 * 1000) / (deltaTime * deltaTime);
 	float speed = (dist * timeFactor) / delta;

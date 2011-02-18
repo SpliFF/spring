@@ -88,7 +88,7 @@ void CFeatureDrawer::RenderFeatureCreated(const CFeature* feature)
 	CFeature* f = const_cast<CFeature*>(feature);
 #if defined(USE_GML) && GML_ENABLE_SIM
 	if(f->model && TEX_TYPE(f) < 0)
-		TEX_TYPE(f) = texturehandlerS3O->LoadS3OTextureNow(f->model->tex1, f->model->tex2, f->model->flipTexY, f->model->invertAlpha);
+		TEX_TYPE(f) = texturehandlerS3O->LoadS3OTextureNow(f->model);
 #endif
 
 	if (f->def->drawType == DRAWTYPE_MODEL) {
@@ -232,7 +232,7 @@ void CFeatureDrawer::DrawOpaqueFeatures(int modelType)
 	FeatureSet::iterator featureSetIt;
 
 	for (featureBinIt = featureBin.begin(); featureBinIt != featureBin.end(); ++featureBinIt) {
-		if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_OBJ || modelType == MODELTYPE_ASS) {
+		if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_ASS) {
 			texturehandlerS3O->SetS3oTexture(featureBinIt->first);
 		}
 
@@ -381,7 +381,7 @@ void CFeatureDrawer::DrawFadeFeaturesHelper(int modelType) {
 		FeatureRenderBin& featureBin = cloakedModelRenderers[modelType]->GetFeatureBinMutable();
 
 		for (FeatureRenderBinIt it = featureBin.begin(); it != featureBin.end(); ++it) {
-			if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_OBJ || modelType == MODELTYPE_ASS) {
+			if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_ASS) {
 				texturehandlerS3O->SetS3oTexture(it->first);
 			}
 

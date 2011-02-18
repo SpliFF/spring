@@ -512,7 +512,7 @@ void CUnitDrawer::DrawOpaqueUnits(int modelType, const CUnit* excludeUnit, bool 
 	UnitSet::const_iterator unitSetIt;
 
 	for (unitBinIt = unitBin.begin(); unitBinIt != unitBin.end(); ++unitBinIt) {
-		if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_OBJ || modelType == MODELTYPE_ASS) {
+		if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_ASS) {
 			texturehandlerS3O->SetS3oTexture(unitBinIt->first);
 		}
 
@@ -772,13 +772,13 @@ inline void CUnitDrawer::DrawOpaqueUnitShadow(CUnit* unit) {
 		#define S3O_TEX(model) \
 			texturehandlerS3O->GetS3oTex(model->textureType)
 		#define PUSH_SHADOW_TEXTURE_STATE(model)                                  \
-			if (model->type == MODELTYPE_S3O || model->type == MODELTYPE_OBJ || model->type == MODELTYPE_ASS) {   \
+			if (model->type == MODELTYPE_S3O || model->type == MODELTYPE_ASS) {   \
 				glActiveTexture(GL_TEXTURE0);                                     \
 				glEnable(GL_TEXTURE_2D);                                          \
 				glBindTexture(GL_TEXTURE_2D, S3O_TEX(model)->tex2);               \
 			}
 		#define POP_SHADOW_TEXTURE_STATE(model)                                   \
-			if (model->type == MODELTYPE_S3O || model->type == MODELTYPE_OBJ || model->type == MODELTYPE_ASS) {   \
+			if (model->type == MODELTYPE_S3O || model->type == MODELTYPE_ASS) {   \
 				glBindTexture(GL_TEXTURE_2D, 0);                                  \
 				glDisable(GL_TEXTURE_2D);                                         \
 				glActiveTexture(GL_TEXTURE0);                                     \
@@ -1035,7 +1035,7 @@ void CUnitDrawer::DrawCloakedUnitsHelper(int modelType)
 
 		// cloaked units
 		for (UnitRenderBinIt it = unitBin.begin(); it != unitBin.end(); ++it) {
-			if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_OBJ || modelType == MODELTYPE_ASS) {
+			if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_ASS) {
 				texturehandlerS3O->SetS3oTexture(it->first);
 			}
 
@@ -1092,7 +1092,7 @@ inline void CUnitDrawer::DrawCloakedUnit(CUnit* unit, int modelType, bool drawGh
 		glTranslatef3(unit->pos);
 		glRotatef(unit->buildFacing * 90.0f, 0, 1, 0);
 
-		if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_OBJ || modelType == MODELTYPE_ASS) {
+		if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_ASS) {
 			// the units in liveGhostedBuildings[modelType] are not
 			// sorted by textureType, but we cannot merge them with
 			// cloakedModelRenderers[modelType] since they are not
@@ -1176,7 +1176,7 @@ void CUnitDrawer::DrawGhostedBuildings(int modelType)
 				glTranslatef3((*it)->pos);
 				glRotatef((*it)->facing * 90.0f, 0, 1, 0);
 
-				if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_OBJ || modelType == MODELTYPE_ASS)
+				if (modelType == MODELTYPE_S3O || modelType == MODELTYPE_ASS)
 					texturehandlerS3O->SetS3oTexture((*it)->model->textureType);
 
 				SetTeamColour((*it)->team, cloakAlpha1);
@@ -1552,7 +1552,7 @@ void CUnitDrawer::DrawIndividual(CUnit* unit)
 		SetupForUnitDrawing();
 		opaqueModelRenderers[MDL_TYPE(unit)]->PushRenderState();
 
-		if (MDL_TYPE(unit) == MODELTYPE_S3O || MDL_TYPE(unit) == MODELTYPE_OBJ || MDL_TYPE(unit) == MODELTYPE_ASS) {
+		if (MDL_TYPE(unit) == MODELTYPE_S3O || MDL_TYPE(unit) == MODELTYPE_ASS) {
 			texturehandlerS3O->SetS3oTexture(TEX_TYPE(unit));
 		}
 
@@ -1592,7 +1592,7 @@ void CUnitDrawer::DrawBuildingSample(const UnitDef* unitdef, int side, float3 po
 			texturehandler3DO->Set3doAtlases();
 		} break;
 		case MODELTYPE_S3O:
-		case MODELTYPE_OBJ: {
+		case MODELTYPE_ASS: {
 			texturehandlerS3O->SetS3oTexture(model->textureType);
 		} break;
 		default: {
@@ -1987,7 +1987,7 @@ inline void CUnitDrawer::UpdateUnitIconState(CUnit* unit) {
 #ifdef USE_GML
 		if (showHealthBars && !unit->noDraw &&
 			(unit->health < unit->maxHealth || unit->paralyzeDamage > 0.0f || unit->limExperience > 0.0f ||
-			unit->beingBuilt || unit->stockpileWeapon || unit->group) && 
+			unit->beingBuilt || unit->stockpileWeapon || unit->group) &&
 			((unit->pos - camera->pos).SqLength() < (unitDrawDistSqr * 500.0f)))
 			drawStat.insert(unit);
 #endif
@@ -2160,7 +2160,7 @@ void CUnitDrawer::RenderUnitCreated(const CUnit* u, int cloaked) {
 
 #if defined(USE_GML) && GML_ENABLE_SIM
 	if (u->model && TEX_TYPE(u) < 0)
-		TEX_TYPE(u) = texturehandlerS3O->LoadS3OTextureNow(u->model->tex1, u->model->tex2, u->model->flipTexY, u->model->invertAlpha);
+		TEX_TYPE(u) = texturehandlerS3O->LoadS3OTextureNow(u->model);
 #endif
 
 	if (building)

@@ -45,11 +45,9 @@ CS3OTextureHandler::~CS3OTextureHandler()
 
 void CS3OTextureHandler::LoadS3OTexture(S3DModel* model) {
 #if defined(USE_GML) && GML_ENABLE_SIM
-	logOutput.Print(LOG_TEXTURE, "GML load S3O %s", model->name.c_str());
 	model->textureType=-1;
 #else
-	logOutput.Print(LOG_TEXTURE, "Load S3O %s", model->name.c_str());
-	model->textureType=LoadS3OTextureNow(model->tex1, model->tex2, model->flipTexY, model->invertAlpha);
+	model->textureType=LoadS3OTextureNow(model);
 #endif
 }
 
@@ -61,8 +59,8 @@ int CS3OTextureHandler::LoadS3OTextureNow(const S3DModel* model)
 	GML_STDMUTEX_LOCK(model); // LoadS3OTextureNow
 
 	logOutput.Print(LOG_TEXTURE, "Load S3O texture now (Flip Y Axis: %s, Invert Team Alpha: %s)",
-		model->flipY ? "yes" : "no",
-		model->invertAlpha ? "yes" : "no"
+		model->flipTexY ? "yes" : "no",
+		model->invertTexAlpha ? "yes" : "no"
 	);
 
 	const string totalName = model->tex1 + model->tex2;
@@ -93,8 +91,8 @@ int CS3OTextureHandler::LoadS3OTextureNow(const S3DModel* model)
 	tex.tex1      = tex1bm.CreateTexture(true);
 	tex.tex1SizeX = tex1bm.xsize;
 	tex.tex1SizeY = tex1bm.ysize;
-	if (model->flipY) tex1bm.ReverseYAxis();
-	if (model->invertAlpha) tex1bm.InvertAlpha();
+	if (model->flipTexY) tex1bm.ReverseYAxis();
+	if (model->invertTexAlpha) tex1bm.InvertAlpha();
 
 	logOutput.Print(LOG_TEXTURE, "Loading texture 2: %s", model->tex2.c_str());
 
@@ -114,7 +112,7 @@ int CS3OTextureHandler::LoadS3OTextureNow(const S3DModel* model)
 	tex.tex2      = tex2bm.CreateTexture(true);
 	tex.tex2SizeX = tex2bm.xsize;
 	tex.tex2SizeY = tex2bm.ysize;
-	if (model->flipY) tex2bm.ReverseYAxis();
+	if (model->flipTexY) tex2bm.ReverseYAxis();
 
 	s3oTextures.push_back(tex);
 	s3oTextureNames[totalName] = tex.num;

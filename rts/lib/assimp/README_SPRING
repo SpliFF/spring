@@ -13,6 +13,7 @@ Changes from official Assimp SDK:
 5.) Prepend streflop:: to math functions to resolve ambiguous calls.
 6.) ASSIMP_BUILD_BOOST_WORKAROUND build option set in CMakeLists to disable threading.
 7.) Newlines added to EOF to suppress GCC warnings in BoostWorkaround/boost/*.h
+8.) Assimp CMakeLists updated to build static rather than shared lib. 
 
 Changes to Spring:
 

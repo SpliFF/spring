@@ -1552,7 +1552,7 @@ void CUnitDrawer::DrawIndividual(CUnit* unit)
 		SetupForUnitDrawing();
 		opaqueModelRenderers[MDL_TYPE(unit)]->PushRenderState();
 
-		if (MDL_TYPE(unit) == MODELTYPE_S3O || MDL_TYPE(unit) == MODELTYPE_OBJ) || MDL_TYPE(unit) == MODELTYPE_ASS) {
+		if (MDL_TYPE(unit) == MODELTYPE_S3O || MDL_TYPE(unit) == MODELTYPE_OBJ || MDL_TYPE(unit) == MODELTYPE_ASS) {
 			texturehandlerS3O->SetS3oTexture(TEX_TYPE(unit));
 		}
 

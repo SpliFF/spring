@@ -146,8 +146,7 @@
 #include "System/Net/PackPacket.h"
 #include "System/Platform/CrashHandler.h"
 #include "System/Sound/ISound.h"
-#include "System/Sound/IEffectChannel.h"
-#include "System/Sound/IMusicChannel.h"
+#include "System/Sound/SoundChannels.h"
 #include "System/Sync/SyncedPrimitiveIO.h"
 #include "System/Sync/SyncTracer.h"
 
@@ -303,7 +302,7 @@ CGame::~CGame()
 
 	CLoadScreen::DeleteInstance();
 	IVideoCapturing::FreeInstance();
-	ISound::Shutdown();
+	sound::ISound::Shutdown();
 
 	CLuaGaia::FreeHandler();
 	CLuaRules::FreeHandler();
@@ -335,7 +334,7 @@ CGame::~CGame()
 	SafeDelete(camHandler);
 	SafeDelete(camera);
 	SafeDelete(cam2);
-	SafeDelete(iconHandler);
+	SafeDelete(icon::iconHandler);
 	SafeDelete(inMapDrawer);
 	SafeDelete(geometricObjects);
 	SafeDelete(farTextureHandler);
@@ -410,7 +409,7 @@ void CGame::LoadDefs()
 {
 	{
 		loadscreen->SetLoadMessage("Loading Radar Icons");
-		iconHandler = new CIconHandler();
+		icon::iconHandler = new icon::CIconHandler();
 	}
 
 	{
@@ -455,8 +454,8 @@ void CGame::LoadDefs()
 		ScopedOnceTimer timer("Loading Sound Definitions");
 		loadscreen->SetLoadMessage("Loading Sound Definitions");
 
-		sound->LoadSoundDefs("gamedata/sounds.lua");
-		chatSound = sound->GetSoundId("IncomingChat", false);
+		gSound->LoadSoundDefs("gamedata/sounds.lua");
+		chatSound = gSound->GetSoundId("IncomingChat", false);
 	}
 }
 
@@ -1282,7 +1281,7 @@ bool CGame::Draw() {
 		CInputReceiver::CollectGarbage();
 		if (!skipping) {
 			// TODO call only when camera changed
-			sound->UpdateListener(camera->pos, camera->forward, camera->up, globalRendering->lastFrameTime);
+			gSound->UpdateListener(camera->pos, camera->forward, camera->up, globalRendering->lastFrameTime);
 		}
 	}
 
@@ -1361,7 +1360,7 @@ bool CGame::Draw() {
 			cubeMapHandler->UpdateSpecularTexture();
 			cubeMapHandler->UpdateReflectionTexture();
 			sky->UpdateSkyTexture();
-
+			readmap->UpdateShadingTexture();
 
 			if (FBO::IsSupported())
 				FBO::Unbind();
@@ -1400,7 +1399,7 @@ bool CGame::Draw() {
 		eventHandler.DrawScreenEffects();
 	}
 
-	hudDrawer->Draw(gu->directControl);
+	hudDrawer->Draw((gu->GetMyPlayer())->fpsController.GetControllee());
 	debugDrawerAI->Draw();
 
 	glEnable(GL_TEXTURE_2D);
@@ -1764,16 +1763,15 @@ void CGame::SimFrame() {
 		infoConsole->Update();
 		waitCommandsAI.Update();
 		geometricObjects->Update();
-		sound->NewFrame();
+		gSound->NewFrame();
 		eoh->Update();
 		for (size_t a = 0; a < grouphandlers.size(); a++) {
 			grouphandlers[a]->Update();
 		}
 		profiler.Update();
 
-		if (gu->directControl) {
-			(playerHandler->Player(gu->myPlayerNum)->dccs).SendStateUpdate(camMove);
-		}
+		(playerHandler->Player(gu->myPlayerNum)->fpsController).SendStateUpdate(camMove);
+
 		CTeamHighlight::Update(gs->frameNum);
 		globalRendering->UpdateSun();
 	}
@@ -1824,17 +1822,17 @@ void CGame::UpdateUI(bool updateCam)
 {
 	if (updateCam) {
 		CPlayer* player = playerHandler->Player(gu->myPlayerNum);
-		DirectControlClientState& dccs = player->dccs;
+		FPSUnitController& fpsCon = player->fpsController;
 
-		if (dccs.oldDCpos != ZeroVector) {
+		if (fpsCon.oldDCpos != ZeroVector) {
 			GML_STDMUTEX_LOCK(pos); // UpdateUI
 
-			camHandler->GetCurrentController().SetPos(dccs.oldDCpos);
-			dccs.oldDCpos = ZeroVector;
+			camHandler->GetCurrentController().SetPos(fpsCon.oldDCpos);
+			fpsCon.oldDCpos = ZeroVector;
 		}
 	}
 
-	if (!gu->directControl) {
+	if (!gu->fpsMode) {
 		float cameraSpeed = 1.0f;
 
 		if (camMove[7]) { cameraSpeed *=  0.1f; }
@@ -2073,27 +2071,27 @@ void CGame::HandleChatMsg(const ChatMessage& msg)
 			const bool allied = teamHandler->Ally(msgAllyTeam, gu->myAllyTeam);
 			if (gu->spectating || (allied && !player->spectator)) {
 				logOutput.Print(label + "Allies: " + s);
-				Channels::UserInterface.PlaySample(chatSound, 5);
+				sound::Channels::UserInterface.PlaySample(chatSound, 5);
 			}
 		}
 		else if (msg.destination == ChatMessage::TO_SPECTATORS) {
 			if (gu->spectating || myMsg) {
 				logOutput.Print(label + "Spectators: " + s);
-				Channels::UserInterface.PlaySample(chatSound, 5);
+				sound::Channels::UserInterface.PlaySample(chatSound, 5);
 			}
 		}
 		else if (msg.destination == ChatMessage::TO_EVERYONE) {
 			const bool specsOnly = noSpectatorChat && (player && player->spectator);
 			if (gu->spectating || !specsOnly) {
 				logOutput.Print(label + s);
-				Channels::UserInterface.PlaySample(chatSound, 5);
+				sound::Channels::UserInterface.PlaySample(chatSound, 5);
 			}
 		}
 		else if (msg.destination < playerHandler->ActivePlayers())
 		{
 			if (msg.destination == gu->myPlayerNum && player && !player->spectator) {
 				logOutput.Print(label + "Private: " + s);
-				Channels::UserInterface.PlaySample(chatSound, 5);
+				sound::Channels::UserInterface.PlaySample(chatSound, 5);
 			}
 			else if (player->playerNum == gu->myPlayerNum)
 			{
@@ -2123,9 +2121,9 @@ void CGame::StartSkip(int toFrame) {
 	skipTotalFrames = skipEndFrame - skipStartFrame;
 	skipSeconds = (float)(skipTotalFrames) / (float)GAME_SPEED;
 
-	skipSoundmute = sound->IsMuted();
+	skipSoundmute = gSound->IsMuted();
 	if (!skipSoundmute)
-		sound->Mute(); // no sounds
+		gSound->Mute(); // no sounds
 
 	skipOldSpeed     = gs->speedFactor;
 	skipOldUserSpeed = gs->userSpeedFactor;
@@ -2148,7 +2146,7 @@ void CGame::EndSkip() {
 	gs->userSpeedFactor = skipOldUserSpeed;
 
 	if (!skipSoundmute)
-		sound->Mute(); // sounds back on
+		gSound->Mute(); // sounds back on
 
 	logOutput.Print("Skipped %.1f seconds\n", skipSeconds);
 }

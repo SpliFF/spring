@@ -33,7 +33,7 @@
 #include "System/FastMath.h"
 #include "System/myMath.h"
 #include "System/Vec2.h"
-#include "System/Sound/IEffectChannel.h"
+#include "System/Sound/SoundChannels.h"
 #include "System/Sync/SyncTracer.h"
 
 #define MIN_WAYPOINT_DISTANCE (SQUARE_SIZE << 1)
@@ -202,14 +202,13 @@ void CGroundMoveType::Update()
 	ASSERT_SYNCED_FLOAT3(owner->pos);
 
 	const UnitDef* ud = owner->unitDef;
+	bool wantReverse = false;
 
 	if (owner->stunned || owner->beingBuilt) {
 		owner->script->StopMoving();
 		owner->speed = ZeroVector;
 	} else {
-		bool wantReverse = false;
-
-		if (owner->directControl) {
+		if (owner->fpsControlPlayer != NULL) {
 			wantReverse = UpdateDirectControl();
 			ChangeHeading(owner->heading + deltaHeading);
 		} else {
@@ -287,15 +286,16 @@ void CGroundMoveType::Update()
 
 			pathManager->UpdatePath(owner, pathId);
 		}
-
-		UpdateOwnerPos(wantReverse);
 	}
 
+	// these must be executed even when stunned (so
+	// units do not get buried by restoring terrain)
+	UpdateOwnerPos(wantReverse);
+	AdjustPosToWaterLine();
+
 	if (owner->pos != oldPos) {
-		// these checks must be executed even when we are stunned
 		TestNewTerrainSquare();
 		HandleObjectCollisions();
-		AdjustPosToWaterLine();
 
 		owner->speed = owner->pos - oldPos;
 		owner->UpdateMidPos();
@@ -413,7 +413,7 @@ void CGroundMoveType::StartMoving(float3 moveGoalPos, float goalRadius, float sp
 	if (owner->team == gu->myTeam) {
 		const int soundIdx = owner->unitDef->sounds.activate.getRandomIdx();
 		if (soundIdx >= 0) {
-			Channels::UnitReply.PlaySample(
+			sound::Channels::UnitReply.PlaySample(
 				owner->unitDef->sounds.activate.getID(soundIdx), owner,
 				owner->unitDef->sounds.activate.getVolume(soundIdx));
 		}
@@ -439,7 +439,7 @@ void CGroundMoveType::StopMoving() {
 
 
 
-void CGroundMoveType::SetDeltaSpeed(float newWantedSpeed, bool wantReverse)
+void CGroundMoveType::SetDeltaSpeed(float newWantedSpeed, bool wantReverse, bool fpsMode)
 {
 	wantedSpeed = newWantedSpeed;
 
@@ -466,7 +466,8 @@ void CGroundMoveType::SetDeltaSpeed(float newWantedSpeed, bool wantReverse)
 		const float3 goalDif = reversing? goalDifRev: goalDifFwd;
 		const short turnDeltaHeading = owner->heading - GetHeadingFromVector(goalDif.x, goalDif.z);
 
-		if (turnDeltaHeading != 0) {
+		if (!fpsMode && turnDeltaHeading != 0) {
+			// only auto-adjust speed for turns when not in FPS mode
 			const bool moreCommands = owner->commandAI->HasMoreMoveCommands();
 			const bool startBreaking = (haveFinalWaypoint && !atGoal);
 
@@ -1279,7 +1280,7 @@ void CGroundMoveType::Arrived()
 		if (owner->team == gu->myTeam) {
 			const int soundIdx = owner->unitDef->sounds.arrived.getRandomIdx();
 			if (soundIdx >= 0) {
-				Channels::UnitReply.PlaySample(
+				sound::Channels::UnitReply.PlaySample(
 					owner->unitDef->sounds.arrived.getID(soundIdx), owner,
 					owner->unitDef->sounds.arrived.getVolume(soundIdx));
 			}
@@ -1888,40 +1889,42 @@ void CGroundMoveType::AdjustPosToWaterLine()
 
 bool CGroundMoveType::UpdateDirectControl()
 {
-	const bool wantReverse = (owner->directControl->back && !owner->directControl->forward);
+	const CPlayer* myPlayer = gu->GetMyPlayer();
+	const FPSUnitController& selfCon = myPlayer->fpsController;
+	const FPSUnitController& unitCon = owner->fpsControlPlayer->fpsController;
+	const bool wantReverse = (unitCon.back && !unitCon.forward);
 
 	waypoint = owner->pos;
 	waypoint += wantReverse ? -owner->frontdir * 100 : owner->frontdir * 100;
 	waypoint.CheckInBounds();
 
-	if (owner->directControl->forward) {
-		assert(!wantReverse);
-		SetDeltaSpeed(maxSpeed, wantReverse);
+	if (unitCon.forward) {
+		SetDeltaSpeed(maxSpeed, wantReverse, true);
 
 		owner->isMoving = true;
 		owner->script->StartMoving();
-	} else if (owner->directControl->back) {
-		assert(wantReverse);
-		SetDeltaSpeed(maxReverseSpeed, wantReverse);
+	} else if (unitCon.back) {
+		SetDeltaSpeed(maxReverseSpeed, wantReverse, true);
 
 		owner->isMoving = true;
 		owner->script->StartMoving();
 	} else {
-		SetDeltaSpeed(0.0f, false);
+		// not moving forward or backward, stop
+		SetDeltaSpeed(0.0f, false, true);
 
 		owner->isMoving = false;
 		owner->script->StopMoving();
 	}
+
 	deltaHeading = 0;
-	if (owner->directControl->left) {
-		deltaHeading += (short) turnRate;
-	}
-	if (owner->directControl->right) {
-		deltaHeading -= (short) turnRate;
+
+	if (unitCon.left ) { deltaHeading += (short) turnRate; }
+	if (unitCon.right) { deltaHeading -= (short) turnRate; }
+
+	if (selfCon.GetControllee() == owner) {
+		camera->rot.y += (deltaHeading * TAANG2RAD);
 	}
 
-	if (gu->directControl == owner)
-		camera->rot.y += deltaHeading * TAANG2RAD;
 	return wantReverse;
 }
 
@@ -1945,8 +1948,6 @@ void CGroundMoveType::UpdateOwnerPos(bool wantReverse)
 		// a new path is requested
 		currentSpeed += deltaSpeed;
 		owner->pos += (flatFrontDir * currentSpeed * (reversing? -1.0f: 1.0f));
-
-		AdjustPosToWaterLine();
 	}
 
 	if (!wantReverse && currentSpeed == 0.0f) {

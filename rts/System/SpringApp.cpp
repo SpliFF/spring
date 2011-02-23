@@ -37,7 +37,6 @@
 #include "Rendering/GLContext.h"
 #include "Rendering/VerticalSync.h"
 #include "Rendering/WindowManagerHelper.h"
-#include "Rendering/Textures/Bitmap.h"
 #include "Rendering/Textures/TAPalette.h"
 #include "Rendering/Textures/NamedTextures.h"
 #include "Rendering/Textures/TextureAtlas.h"
@@ -213,7 +212,7 @@ bool SpringApp::Initialize()
 	LuaOpenGL::Init();
 
 	// Sound
-	ISound::Initialize();
+	sound::ISound::Initialize();
 
 	SetProcessAffinity(configHandler->Get("SetCoreAffinity", 0));
 
@@ -1213,7 +1212,7 @@ void SpringApp::Shutdown()
 	delete gameServer;
 	delete gameSetup;
 	CLoadScreen::DeleteInstance();
-	ISound::Shutdown();
+	sound::ISound::Shutdown();
 	delete font;
 	delete smallFont;
 	CNamedTextures::Kill();
@@ -1281,8 +1280,8 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 
 			if (event.active.state & (SDL_APPACTIVE | (globalRendering->fullScreen ? SDL_APPINPUTFOCUS : 0))) {
 				globalRendering->active = !!event.active.gain;
-				if (ISound::IsInitialized()) {
-					sound->Iconified(!event.active.gain);
+				if (sound::ISound::IsInitialized()) {
+					gSound->Iconified(!event.active.gain);
 				}
 			}
 

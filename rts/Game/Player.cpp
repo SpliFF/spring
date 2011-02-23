@@ -2,7 +2,6 @@
 
 #include "StdAfx.h"
 #include <assert.h>
-#include <SDL_mouse.h>
 
 #include "mmgr.h"
 
@@ -11,58 +10,42 @@
 #include "Game/PlayerHandler.h"
 #include "Game/Camera.h"
 #include "Game/CameraHandler.h"
-#include "Game/GameHelper.h"
+#include "Game/SelectedUnits.h"
 #include "Game/UI/MouseHandler.h"
+#include "Lua/LuaRules.h"
 #include "Sim/Misc/TeamHandler.h"
 #include "Sim/Misc/GlobalSynced.h"
 #include "Sim/Units/Unit.h"
 #include "Sim/Units/UnitHandler.h"
-#include "Sim/Weapons/Weapon.h"
-#include "Sim/Units/Scripts/CobInstance.h"
 #include "System/myMath.h"
 #include "System/EventHandler.h"
 #include "System/GlobalUnsynced.h"
-#include "System/NetProtocol.h"
+#include "System/LogOutput.h"
 
 CR_BIND(CPlayer,);
 
 CR_REG_METADATA(CPlayer, (
-				CR_MEMBER(name),
-				CR_MEMBER(countryCode),
-				CR_MEMBER(rank),
-				CR_MEMBER(spectator),
-				CR_MEMBER(team),
+	CR_MEMBER(name),
+	CR_MEMBER(countryCode),
+	CR_MEMBER(rank),
+	CR_MEMBER(spectator),
+	CR_MEMBER(team),
 
-				CR_MEMBER(active),
-				CR_MEMBER(playerNum),
-//				CR_MEMBER(readyToStart),
-//				CR_MEMBER(cpuUsage),
-//				CR_MEMBER(ping),
-//				CR_MEMBER(currentStats),
+	CR_MEMBER(active),
+	CR_MEMBER(playerNum),
+//	CR_MEMBER(readyToStart),
+//	CR_MEMBER(cpuUsage),
+//	CR_MEMBER(ping),
+//	CR_MEMBER(currentStats),
 
-//				CR_MEMBER(controlledTeams),
-				CR_RESERVED(32)
-				));
+//	CR_MEMBER(controlledTeams),
+	CR_RESERVED(32)
+));
 
 
 //////////////////////////////////////////////////////////////////////
 // Construction/Destruction
 //////////////////////////////////////////////////////////////////////
-
-DirectControlStruct::DirectControlStruct()
-	: forward(false)
-	, back(false)
-	, left(false)
-	, right(false)
-	, mouse1(false)
-	, mouse2(false)
-	, viewDir(float3(0.0f, 0.0f, 1.0f))
-	, targetPos(float3(0.0f, 0.0f, 1.0f))
-	, targetDist(1000)
-	, target(NULL)
-	, myController(NULL)
-{
-}
 
 CPlayer::CPlayer()
 	: PlayerBase()
@@ -70,12 +53,9 @@ CPlayer::CPlayer()
 	, playerNum(-1)
 	, ping(0)
 {
-	myControl.myController = this;
+	fpsController.SetControllerPlayer(this);
 }
 
-CPlayer::~CPlayer()
-{
-}
 
 
 void CPlayer::SetControlledTeams()
@@ -124,64 +104,78 @@ void CPlayer::StartSpectating()
 	}
 
 	spectator = true;
-	if (dccs.playerControlledUnit != NULL) {
-		StopControllingUnit();
-	}
 
-	if (playerHandler->Player(gu->myPlayerNum) == this) { //TODO bad hack
+	if (gu->myPlayerNum == this->playerNum) { //TODO bad hack
 		gu->spectating           = true;
 		gu->spectatingFullView   = true;
 		gu->spectatingFullSelect = true;
 	}
+
+	StopControllingUnit();
 	eventHandler.PlayerChanged(playerNum);
 }
 
 void CPlayer::GameFrame(int frameNum)
 {
-	if (!active || (dccs.playerControlledUnit == NULL)) {
+	if (!active || (fpsController.GetControllee() == NULL)) {
 		return;
 	}
 
-	CUnit* unit = dccs.playerControlledUnit;
-	DirectControlStruct* dc = &myControl;
+	fpsController.Update();
+}
 
-	const int piece = unit->script->AimFromWeapon(0);
-	const float3 relPos = unit->script->GetPiecePos(piece);
-	float3 pos = unit->pos +
-		unit->frontdir * relPos.z +
-		unit->updir    * relPos.y +
-		unit->rightdir * relPos.x;
-	pos += UpVector * 7;
 
-	dccs.oldDCpos = pos;
 
-	CUnit* hit;
-	float dist = helper->TraceRayTeam(pos, dc->viewDir, unit->maxRange, hit, 1, unit, teamHandler->AllyTeam(team));
-	dc->target = hit;
+void CPlayer::StartControllingUnit()
+{
+	CUnit* curControlleeUnit = fpsController.GetControllee();
+	CUnit* newControlleeUnit = NULL;
 
-	if (hit) {
-		dc->targetDist = dist;
-		dc->targetPos = hit->pos;
-		if (!dc->mouse2) {
-			unit->AttackUnit(hit, true);
-		}
+	if (curControlleeUnit != NULL) {
+		// player released control
+		StopControllingUnit();
 	} else {
-		if (dist > unit->maxRange * 0.95f) {
-			dist = unit->maxRange * 0.95f;
+		// player took control
+		const std::vector<int>& ourSelectedUnits = selectedUnits.netSelected[this->playerNum];
+
+		if (ourSelectedUnits.empty()) {
+			return;
 		}
 
-		dc->targetDist = dist;
-		dc->targetPos = pos + dc->viewDir * dc->targetDist;
+		// pick the first unit we have selected
+		newControlleeUnit = uh->GetUnit(ourSelectedUnits[0]);
 
-		if (!dc->mouse2) {
-			unit->AttackGround(dc->targetPos, true);
-			for (std::vector<CWeapon*>::iterator wi = unit->weapons.begin(); wi != unit->weapons.end(); ++wi) {
-				float d = dc->targetDist;
-				if (d > (*wi)->range * 0.95f) {
-					d = (*wi)->range * 0.95f;
+		if (newControlleeUnit == NULL || newControlleeUnit->weapons.empty()) {
+			return;
+		}
+
+
+		if (newControlleeUnit->fpsControlPlayer != NULL) {
+			if (this->playerNum == gu->myPlayerNum) {
+				logOutput.Print(
+					"player %d (%s) is already controlling unit %d",
+					newControlleeUnit->fpsControlPlayer->playerNum,
+					newControlleeUnit->fpsControlPlayer->name.c_str(),
+					newControlleeUnit->id
+				);
+			}
+		}
+		else if (luaRules == NULL || luaRules->AllowDirectUnitControl(this->playerNum, newControlleeUnit)) {
+			newControlleeUnit->fpsControlPlayer = this;
+			fpsController.SetControlleeUnit(newControlleeUnit);
+
+			if (this->playerNum == gu->myPlayerNum) {
+				// update the unsynced state
+				gu->fpsMode = true;
+				mouse->wasLocked = mouse->locked;
+
+				if (!mouse->locked) {
+					mouse->locked = true;
+					mouse->HideMouse();
 				}
-				const float3 p = pos + dc->viewDir * d;
-				(*wi)->AttackGround(p, true);
+				camHandler->PushMode();
+				camHandler->SetCameraMode(0);
+				selectedUnits.ClearSelected();
 			}
 		}
 	}
@@ -189,18 +183,23 @@ void CPlayer::GameFrame(int frameNum)
 
 void CPlayer::StopControllingUnit()
 {
-	if (!dccs.playerControlledUnit) {
+	if (fpsController.GetControllee() == NULL || mouse == NULL) {
 		return;
 	}
 
-	CUnit* unit = dccs.playerControlledUnit;
-	unit->directControl = NULL;
-	unit->AttackUnit(NULL, true);
-	if (gu->directControl == dccs.playerControlledUnit) {
-		assert(playerHandler->Player(gu->myPlayerNum) == this);
-		gu->directControl = NULL;
+	CPlayer* that = gu->GetMyPlayer();
+	CUnit* thatUnit = that->fpsController.GetControllee();
+	CUnit* thisUnit = this->fpsController.GetControllee();
 
-		// Switch back to the camera we were using before.
+	thisUnit->fpsControlPlayer = NULL;
+	thisUnit->AttackUnit(NULL, true, true);
+
+	if (thatUnit == thisUnit) {
+		// update the  unsynced state
+		gu->fpsMode = false;
+		assert(gu->myPlayerNum == this->playerNum);
+
+		// switch back to the camera we were using before
 		camHandler->PopMode();
 
 		if (mouse->locked && !mouse->wasLocked) {
@@ -209,28 +208,5 @@ void CPlayer::StopControllingUnit()
 		}
 	}
 
-	dccs.playerControlledUnit = NULL;
-}
-
-
-
-void DirectControlClientState::SendStateUpdate(bool* camMove) {
-	unsigned char state = 0;
-
-	if (camMove[0]) { state |= (1 << 0); }
-	if (camMove[1]) { state |= (1 << 1); }
-	if (camMove[2]) { state |= (1 << 2); }
-	if (camMove[3]) { state |= (1 << 3); }
-	if (mouse->buttons[SDL_BUTTON_LEFT].pressed)  { state |= (1 << 4); }
-	if (mouse->buttons[SDL_BUTTON_RIGHT].pressed) { state |= (1 << 5); }
-
-	shortint2 hp = GetHAndPFromVector(camera->forward);
-
-	if (hp.x != oldHeading || hp.y != oldPitch || state != oldState) {
-		oldHeading = hp.x;
-		oldPitch   = hp.y;
-		oldState   = state;
-
-		net->Send(CBaseNetProtocol::Get().SendDirectControlUpdate(gu->myPlayerNum, state, hp.x, hp.y));
-	}
+	fpsController.SetControlleeUnit(NULL);
 }

@@ -6,10 +6,10 @@
 #include "UnitDrawer.h"
 
 #include "Game/Camera.h"
+#include "Game/CameraHandler.h"
 #include "Game/GameHelper.h"
 #include "Game/GameSetup.h"
-#include "Game/SelectedUnits.h"
-#include "Game/CameraHandler.h"
+#include "Game/Player.h"
 #include "Game/UI/MiniMap.h"
 #include "Lua/LuaMaterial.h"
 #include "Lua/LuaUnitMaterial.h"
@@ -217,21 +217,22 @@ CUnitDrawer::~CUnitDrawer()
 bool CUnitDrawer::LoadModelShaders()
 {
 	#define sh shaderHandler
-	modelShaders.resize(MODEL_SHADER_S3O_LAST, NULL);
-
-	modelShaders[MODEL_SHADER_S3O_BASIC ] = sh->CreateProgramObject("[UnitDrawer]", "S3OShaderDefARB", true);
-	modelShaders[MODEL_SHADER_S3O_SHADOW] = modelShaders[MODEL_SHADER_S3O_BASIC];
-	modelShaders[MODEL_SHADER_S3O_ACTIVE] = modelShaders[MODEL_SHADER_S3O_BASIC];
 
 	if (!globalRendering->haveARB) {
 		// not possible to do (ARB) shader-based model rendering
 		logOutput.Print("[LoadModelShaders] OpenGL ARB extensions missing for advanced unit shading");
 		return false;
 	}
-	if (!(!!configHandler->Get("AdvUnitShading", 1))) {
+	if (configHandler->Get("AdvUnitShading", 1) == 0) {
 		// not allowed to do shader-based model rendering
 		return false;
 	}
+
+	modelShaders.resize(MODEL_SHADER_S3O_LAST, NULL);
+
+	modelShaders[MODEL_SHADER_S3O_BASIC ] = sh->CreateProgramObject("[UnitDrawer]", "S3OShaderDefARB", true);
+	modelShaders[MODEL_SHADER_S3O_SHADOW] = modelShaders[MODEL_SHADER_S3O_BASIC];
+	modelShaders[MODEL_SHADER_S3O_ACTIVE] = modelShaders[MODEL_SHADER_S3O_BASIC];
 
 	// with advFade, submerged transparent objects are clipped against GL_CLIP_PLANE3
 	const char* vertexProgNameARB = (advFade)? "ARB/units3o2.vp": "ARB/units3o.vp";
@@ -293,7 +294,7 @@ bool CUnitDrawer::LoadModelShaders()
 
 
 void CUnitDrawer::UpdateSunDir() {
-	if (shadowHandler->shadowsSupported && globalRendering->haveGLSL) {
+	if (advShading && shadowHandler->shadowsSupported && globalRendering->haveGLSL) {
 		modelShaders[MODEL_SHADER_S3O_SHADOW]->Enable();
 		modelShaders[MODEL_SHADER_S3O_SHADOW]->SetUniform3fv(5, &globalRendering->sunDir[0]);
 		modelShaders[MODEL_SHADER_S3O_SHADOW]->SetUniform1f(12, globalRendering->unitShadowDensity);
@@ -470,7 +471,8 @@ void CUnitDrawer::Draw(bool drawReflection, bool drawRefraction)
 	camNorm.y = -0.1f;
 	camNorm.ANormalize();
 
-	const CUnit* excludeUnit = drawReflection? NULL: gu->directControl;
+	const CPlayer* myPlayer = gu->GetMyPlayer();
+	const CUnit* excludeUnit = drawReflection? NULL: myPlayer->fpsController.GetControllee();
 
 	SetupForUnitDrawing();
 
@@ -876,10 +878,10 @@ void CUnitDrawer::DrawShadowPass()
 void CUnitDrawer::DrawIcon(CUnit* unit, bool useDefaultIcon)
 {
 	// If the icon is to be drawn as a radar blip, we want to get the default icon.
-	const CIconData* iconData = NULL;
+	const icon::CIconData* iconData = NULL;
 
 	if (useDefaultIcon) {
-		iconData = iconHandler->GetDefaultIconData();
+		iconData = icon::iconHandler->GetDefaultIconData();
 	} else {
 		iconData = unit->unitDef->iconType.GetIconData();
 	}
@@ -1799,13 +1801,6 @@ void CUnitDrawer::DrawUnitBeingBuilt(CUnit* unit)
 
 
 
-void CUnitDrawer::ApplyUnitTransformMatrix(const CUnit* unit)
-{
-	const CMatrix44f& m = unit->GetTransformMatrix();
-	glMultMatrixf(m);
-}
-
-
 inline void CUnitDrawer::DrawUnitModel(CUnit* unit) {
 	if (unit->luaDraw && luaRules && luaRules->DrawUnit(unit->id)) {
 		return;
@@ -1830,7 +1825,7 @@ void CUnitDrawer::DrawUnitNow(CUnit* unit)
 	*/
 
 	glPushMatrix();
-	ApplyUnitTransformMatrix(unit);
+	glMultMatrixf(unit->GetTransformMatrix());
 
 	if (!unit->beingBuilt || !unit->unitDef->showNanoFrame) {
 		DrawUnitModel(unit);
@@ -1850,7 +1845,7 @@ void CUnitDrawer::DrawUnitNow(CUnit* unit)
 void CUnitDrawer::DrawUnitWithLists(CUnit* unit, unsigned int preList, unsigned int postList)
 {
 	glPushMatrix();
-	ApplyUnitTransformMatrix(unit);
+	glMultMatrixf(unit->GetTransformMatrix());
 
 	if (preList != 0) {
 		glCallList(preList);
@@ -1872,7 +1867,7 @@ void CUnitDrawer::DrawUnitWithLists(CUnit* unit, unsigned int preList, unsigned 
 void CUnitDrawer::DrawUnitRaw(CUnit* unit)
 {
 	glPushMatrix();
-	ApplyUnitTransformMatrix(unit);
+	glMultMatrixf(unit->GetTransformMatrix());
 	DrawUnitModel(unit);
 	glPopMatrix();
 }
@@ -1891,7 +1886,7 @@ void CUnitDrawer::DrawUnitRawModel(CUnit* unit)
 void CUnitDrawer::DrawUnitRawWithLists(CUnit* unit, unsigned int preList, unsigned int postList)
 {
 	glPushMatrix();
-	ApplyUnitTransformMatrix(unit);
+	glMultMatrixf(unit->GetTransformMatrix());
 
 	if (preList != 0) {
 		glCallList(preList);

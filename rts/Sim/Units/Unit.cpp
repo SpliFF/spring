@@ -64,15 +64,13 @@
 #include "System/myMath.h"
 #include "System/creg/STL_List.h"
 #include "System/LoadSave/LoadSaveInterface.h"
-#include "System/Sound/IEffectChannel.h"
+#include "System/Sound/SoundChannels.h"
 #include "System/Sync/SyncedPrimitive.h"
 #include "System/Sync/SyncTracer.h"
 
 #define PLAY_SOUNDS 1
 
 CLogSubsystem LOG_UNIT("unit");
-
-CR_BIND_DERIVED(CUnit, CSolidObject, );
 
 // See end of source for member bindings
 //////////////////////////////////////////////////////////////////////
@@ -90,6 +88,7 @@ float CUnit::expGrade       = 0.0f;
 
 CUnit::CUnit() : CSolidObject(),
 	unitDef(NULL),
+	unitDefID(-1),
 	frontdir(0.0f, 0.0f, 1.0f),
 	rightdir(-1.0f, 0.0f, 0.0f),
 	updir(0.0f, 1.0f, 0.0f),
@@ -123,6 +122,7 @@ CUnit::CUnit() : CSolidObject(),
 	deathScriptFinished(false),
 	delayedWreckLevel(-1),
 	restTime(0),
+	outOfMapTime(0),
 	shieldWeapon(NULL),
 	stockpileWeapon(NULL),
 	reloadSpeed(1.0f),
@@ -151,8 +151,11 @@ CUnit::CUnit() : CSolidObject(),
 	moveType(NULL),
 	prevMoveType(NULL),
 	usingScriptMoveType(false),
+	fpsControlPlayer(NULL),
 	commandAI(NULL),
 	group(NULL),
+	localmodel(NULL),
+	script(NULL),
 	condUseMetal(0.0f),
 	condUseEnergy(0.0f),
 	condMakeMetal(0.0f),
@@ -194,8 +197,6 @@ CUnit::CUnit() : CSolidObject(),
 	moveState(MOVESTATE_MANEUVER),
 	dontFire(false),
 	activated(false),
-	localmodel(NULL),
-	script(NULL),
 	crashing(false),
 	isDead(false),
 	falling(false),
@@ -224,7 +225,6 @@ CUnit::CUnit() : CSolidObject(),
 	lastTerrainType(-1),
 	curTerrainType(0),
 	selfDCountdown(0),
-	directControl(NULL),
 	myTrack(NULL),
 	lastFlareDrop(0),
 	currentFuel(0.0f),
@@ -272,9 +272,9 @@ CUnit::~CUnit()
 	tracefile << pos.x << " " << pos.y << " " << pos.z << " " << id << "\n";
 #endif
 
-	if (directControl) {
-		directControl->myController->StopControllingUnit();
-		directControl = NULL;
+	if (fpsControlPlayer != NULL) {
+		fpsControlPlayer->StopControllingUnit();
+		assert(fpsControlPlayer == NULL);
 	}
 
 	if (activated && unitDef->targfac) {
@@ -295,8 +295,7 @@ CUnit::~CUnit()
 	// Remove us from our group, if we were in one
 	SetGroup(NULL);
 
-	std::vector<CWeapon*>::iterator wi;
-	for (wi = weapons.begin(); wi != weapons.end(); ++wi) {
+	for (std::vector<CWeapon*>::const_iterator wi = weapons.begin(); wi != weapons.end(); ++wi) {
 		delete *wi;
 	}
 
@@ -337,7 +336,7 @@ void CUnit::PreInit(const UnitDef* uDef, int uTeam, int facing, const float3& po
 	allyteam = teamHandler->AllyTeam(uTeam);
 
 	unitDef = uDef;
-	unitDefName = unitDef->name;
+	unitDefID = unitDef->id;
 
 	pos = position;
 	pos.CheckInBounds();
@@ -360,8 +359,8 @@ void CUnit::PreInit(const UnitDef* uDef, int uTeam, int facing, const float3& po
 	posErrorVector.y *= 0.2f;
 
 #ifdef TRACE_SYNC
-	tracefile << "[" << __FUNCTION__ << "] new unit: " << unitDefName << " ";
-	tracefile << pos.x << " " << pos.y << " " << pos.z << " " << id << "\n";
+	tracefile << "[" << __FUNCTION__ << "] id: " << id << ", name: " << unitDef->name << " ";
+	tracefile << "pos: <" << pos.x << ", " << pos.y << ", " << pos.z << ">\n";
 #endif
 
 	ASSERT_SYNCED_FLOAT3(pos);
@@ -588,6 +587,7 @@ void CUnit::ForcedSpin(const float3& newDir)
 }
 
 
+/*
 void CUnit::SetFront(const SyncedFloat3& newDir)
 {
 	frontdir = newDir;
@@ -612,7 +612,6 @@ void CUnit::SetUp(const SyncedFloat3& newDir)
 	UpdateMidPos();
 }
 
-
 void CUnit::SetRight(const SyncedFloat3& newDir)
 {
 	rightdir = newDir;
@@ -623,6 +622,24 @@ void CUnit::SetRight(const SyncedFloat3& newDir)
 	frontdir.Normalize();
 	heading = GetHeadingFromVector(frontdir.x, frontdir.z);
 	UpdateMidPos();
+}
+*/
+
+void CUnit::SetDirectionFromHeading()
+{
+	if (GetTransporter() == NULL) {
+		frontdir = GetVectorFromHeading(heading);
+
+		if (upright || !unitDef->canmove) {
+			updir = UpVector;
+			rightdir = frontdir.cross(updir);
+		} else  {
+			updir = ground->GetNormal(pos.x, pos.z);
+			rightdir = frontdir.cross(updir);
+			rightdir.Normalize();
+			frontdir = updir.cross(rightdir);
+		}
+	}
 }
 
 
@@ -732,18 +749,17 @@ void CUnit::Update()
 			moveType->padStatus = 0;
 		}
 		// paralyzed weapons shouldn't reload
-		std::vector<CWeapon*>::iterator wi;
-		for (wi = weapons.begin(); wi != weapons.end(); ++wi) {
+		for (std::vector<CWeapon*>::iterator wi = weapons.begin(); wi != weapons.end(); ++wi) {
 			++(*wi)->reloadStatus;
 		}
 		return;
 	}
 
 	restTime++;
+	outOfMapTime = (pos.IsInBounds())? 0: outOfMapTime + 1;
 
 	if (!dontUseWeapons) {
-		std::vector<CWeapon*>::iterator wi;
-		for (wi = weapons.begin(); wi != weapons.end(); ++wi) {
+		for (std::vector<CWeapon*>::iterator wi = weapons.begin(); wi != weapons.end(); ++wi) {
 			(*wi)->Update();
 		}
 	}
@@ -1039,9 +1055,9 @@ void CUnit::SlowUpdateWeapons() {
 	if (!dontFire) {
 		for (vector<CWeapon*>::iterator wi = weapons.begin(); wi != weapons.end(); ++wi) {
 			CWeapon* w = *wi;
-			
+
 			if (!w->haveUserTarget) {
-				if (haveDGunRequest == (unitDef->canDGun && w->weaponDef->manualfire)) { // == ((!haveDGunRequest && !isDGun) || (haveDGunRequest && isDGun))
+				if ((haveDGunRequest == (unitDef->canDGun && w->weaponDef->manualfire))) {
 					if (userTarget) {
 						w->AttackUnit(userTarget, true);
 					} else if (userAttackGround) {
@@ -1054,24 +1070,6 @@ void CUnit::SlowUpdateWeapons() {
 
 			if (w->targetType == Target_None && fireState > FIRESTATE_HOLDFIRE && lastAttacker && (lastAttack + 200 > gs->frameNum))
 				w->AttackUnit(lastAttacker, false);
-		}
-	}
-}
-
-
-void CUnit::SetDirectionFromHeading()
-{
-	if (GetTransporter() == NULL) {
-		frontdir = GetVectorFromHeading(heading);
-
-		if (upright || !unitDef->canmove) {
-			updir = UpVector;
-			rightdir = frontdir.cross(updir);
-		} else  {
-			updir = ground->GetNormal(pos.x, pos.z);
-			rightdir = frontdir.cross(updir);
-			rightdir.Normalize();
-			frontdir = updir.cross(rightdir);
 		}
 	}
 }
@@ -1402,9 +1400,9 @@ bool CUnit::ChangeTeam(int newteam, ChangeType type)
 	}
 
 	// do not allow old player to keep controlling the unit
-	if (directControl) {
-		directControl->myController->StopControllingUnit();
-		directControl = NULL;
+	if (fpsControlPlayer != NULL) {
+		fpsControlPlayer->StopControllingUnit();
+		assert(fpsControlPlayer == NULL);
 	}
 
 	const int oldteam = team;
@@ -1540,48 +1538,56 @@ void CUnit::ChangeTeamReset()
 }
 
 
-bool CUnit::AttackUnit(CUnit *unit,bool dgun)
+
+bool CUnit::AttackUnit(CUnit* targetUnit, bool wantDGun, bool fpsMode)
 {
-	bool r = false;
-	haveDGunRequest = dgun;
+	bool ret = false;
+
+	haveDGunRequest = wantDGun;
 	userAttackGround = false;
 	commandShotCount = 0;
-	SetUserTarget(unit);
 
-	std::vector<CWeapon*>::iterator wi;
-	for (wi = weapons.begin(); wi != weapons.end(); ++wi) {
-		(*wi)->haveUserTarget = false;
-		(*wi)->targetType = Target_None;
-		if (haveDGunRequest == (unitDef->canDGun && (*wi)->weaponDef->manualfire)) // == ((!haveDGunRequest && !isDGun) || (haveDGunRequest && isDGun))
-			if ((*wi)->AttackUnit(unit, true))
-				r = true;
-	}
-	return r;
-}
-
-
-bool CUnit::AttackGround(const float3& pos, bool dgun)
-{
-	bool r = false;
-
-	haveDGunRequest = dgun;
-	SetUserTarget(0);
-	userAttackPos = pos;
-	userAttackGround = true;
-	commandShotCount = 0;
+	SetUserTarget(targetUnit);
 
 	for (std::vector<CWeapon*>::iterator wi = weapons.begin(); wi != weapons.end(); ++wi) {
-		(*wi)->haveUserTarget = false;
+		CWeapon* w = *wi;
 
-		if (haveDGunRequest == (unitDef->canDGun && (*wi)->weaponDef->manualfire)) { // == ((!haveDGunRequest && !isDGun) || (haveDGunRequest && isDGun))
-			if ((*wi)->AttackGround(pos, true)) {
-				r = true;
+		w->targetType = Target_None;
+
+		if ((wantDGun == (unitDef->canDGun && w->weaponDef->manualfire)) || fpsMode) {
+			if (w->AttackUnit(targetUnit, true)) {
+				ret = true;
 			}
 		}
 	}
 
-	return r;
+	return ret;
 }
+
+bool CUnit::AttackGround(const float3& pos, bool wantDGun, bool fpsMode)
+{
+	bool ret = false;
+
+	haveDGunRequest = wantDGun;
+	userAttackPos = pos;
+	userAttackGround = true;
+	commandShotCount = 0;
+
+	SetUserTarget(NULL);
+
+	for (std::vector<CWeapon*>::iterator wi = weapons.begin(); wi != weapons.end(); ++wi) {
+		CWeapon* w = *wi;
+
+		if ((wantDGun == (unitDef->canDGun && w->weaponDef->manualfire)) || fpsMode) {
+			if (w->AttackGround(pos, true)) {
+				ret = true;
+			}
+		}
+	}
+
+	return ret;
+}
+
 
 
 void CUnit::SetLastAttacker(CUnit* attacker)
@@ -1598,6 +1604,20 @@ void CUnit::SetLastAttacker(CUnit* attacker)
 		AddDeathDependence(attacker);
 }
 
+void CUnit::SetUserTarget(CUnit* target)
+{
+	if (userTarget)
+		DeleteDeathDependence(userTarget, DEPENDENCE_TARGET);
+
+	userTarget = target;
+	for (vector<CWeapon*>::iterator wi = weapons.begin(); wi != weapons.end(); ++wi) {
+		(*wi)->haveUserTarget = false; // should be (target != NULL)?
+	}
+
+	if (target) {
+		AddDeathDependence(target);
+	}
+}
 
 void CUnit::DependentDied(CObject* o)
 {
@@ -1609,22 +1629,6 @@ void CUnit::DependentDied(CObject* o)
 	incomingMissiles.remove((CMissileProjectile*) o);
 
 	CSolidObject::DependentDied(o);
-}
-
-
-void CUnit::SetUserTarget(CUnit* target)
-{
-	if (userTarget)
-		DeleteDeathDependence(userTarget, DEPENDENCE_TARGET);
-
-	userTarget=target;
-	for(vector<CWeapon*>::iterator wi=weapons.begin();wi!=weapons.end();++wi) {
-		(*wi)->haveUserTarget = false;
-	}
-
-	if (target) {
-		AddDeathDependence(target);
-	}
 }
 
 
@@ -1901,8 +1905,8 @@ void CUnit::KillUnit(bool selfDestruct, bool reclaimed, CUnit* attacker, bool sh
 				if (wd->soundhit.getID(0) > 0) {
 					// HACK: loading code doesn't set sane defaults for explosion sounds, so we do it here
 					// NOTE: actually no longer true, loading code always ensures that sound volume != -1
-					float volume = wd->soundhit.getVolume(0);
-					Channels::Battle.PlaySample(wd->soundhit.getID(0), pos, (volume == -1) ? 1.0f : volume);
+					const float volume = wd->soundhit.getVolume(0);
+					sound::Channels::Battle.PlaySample(wd->soundhit.getID(0), pos, (volume == -1) ? 1.0f : volume);
 				}
 				#endif
 			}
@@ -2009,9 +2013,9 @@ void CUnit::Activate()
 	radarhandler->MoveUnit(this);
 
 	#if (PLAY_SOUNDS == 1)
-	int soundIdx = unitDef->sounds.activate.getRandomIdx();
+	const int soundIdx = unitDef->sounds.activate.getRandomIdx();
 	if (soundIdx >= 0) {
-		Channels::UnitReply.PlaySample(
+		sound::Channels::UnitReply.PlaySample(
 			unitDef->sounds.activate.getID(soundIdx), this,
 			unitDef->sounds.activate.getVolume(soundIdx));
 	}
@@ -2033,9 +2037,9 @@ void CUnit::Deactivate()
 	radarhandler->RemoveUnit(this);
 
 	#if (PLAY_SOUNDS == 1)
-	int soundIdx = unitDef->sounds.deactivate.getRandomIdx();
+	const int soundIdx = unitDef->sounds.deactivate.getRandomIdx();
 	if (soundIdx >= 0) {
-		Channels::UnitReply.PlaySample(
+		sound::Channels::UnitReply.PlaySample(
 			unitDef->sounds.deactivate.getID(soundIdx), this,
 			unitDef->sounds.deactivate.getVolume(soundIdx));
 	}
@@ -2104,7 +2108,7 @@ void CUnit::ReleaseTempHoldFire()
 void CUnit::PostLoad()
 {
 	//HACK:Initializing after load
-	unitDef = unitDefHandler->GetUnitDefByName(unitDefName);
+	unitDef = unitDefHandler->GetUnitDefByID(unitDefID);
 
 	curYardMap = (unitDef->yardmaps[buildFacing].empty())? NULL: &unitDef->yardmaps[buildFacing][0];
 
@@ -2232,10 +2236,12 @@ void CUnit::DeleteDeathDependence(CObject* o, DependenceType dep) {
 }
 
 
+
+CR_BIND_DERIVED(CUnit, CSolidObject, );
 // Member bindings
 CR_REG_METADATA(CUnit, (
-	//CR_MEMBER(unitDef),
-	CR_MEMBER(unitDefName),
+	// CR_MEMBER(unitDef),
+	CR_MEMBER(unitDefID),
 	CR_MEMBER(collisionVolume),
 	CR_MEMBER(frontdir),
 	CR_MEMBER(rightdir),
@@ -2271,6 +2277,7 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(deathScriptFinished),
 	CR_MEMBER(delayedWreckLevel),
 	CR_MEMBER(restTime),
+	CR_MEMBER(outOfMapTime),
 	CR_MEMBER(weapons),
 	CR_MEMBER(shieldWeapon),
 	CR_MEMBER(stockpileWeapon),
@@ -2309,6 +2316,9 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(usingScriptMoveType),
 	CR_MEMBER(commandAI),
 	CR_MEMBER(group),
+	// CR_MEMBER(fpsControlPlayer),
+	// CR_MEMBER(localmodel),
+	// CR_MEMBER(script),
 	CR_MEMBER(condUseMetal),
 	CR_MEMBER(condUseEnergy),
 	CR_MEMBER(condMakeMetal),
@@ -2354,8 +2364,6 @@ CR_REG_METADATA(CUnit, (
 //	CR_MEMBER(lastUnitUpdate),
 //#endif
 	//CR_MEMBER(model),
-	//CR_MEMBER(localmodel),
-	//CR_MEMBER(script),
 	CR_MEMBER(tooltip),
 	CR_MEMBER(crashing),
 	CR_MEMBER(isDead),
@@ -2386,7 +2394,6 @@ CR_REG_METADATA(CUnit, (
 	CR_MEMBER(lastTerrainType),
 	CR_MEMBER(curTerrainType),
 	CR_MEMBER(selfDCountdown),
-//	CR_MEMBER(directControl),
 	//CR_MEMBER(myTrack), // unused
 	CR_MEMBER(incomingMissiles),
 	CR_MEMBER(lastFlareDrop),
@@ -2411,4 +2418,4 @@ CR_REG_METADATA(CUnit, (
 //	CR_MEMBER(expGrade),
 
 	CR_POSTLOAD(PostLoad)
-	));
+));

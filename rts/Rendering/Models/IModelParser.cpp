@@ -30,8 +30,8 @@ C3DModelLoader* modelParser = NULL;
 C3DModelLoader::C3DModelLoader()
 {
 	// file-extension should be lowercase
-	AddParser("3do", new C3DOParser());
-	AddParser("s3o", new CS3OParser());
+	parsers["3do"] = new C3DOParser();
+	parsers["s3o"] = new CS3OParser();
 
 	// assimp library
 	CAssParser* unitassparser = new CAssParser();
@@ -47,7 +47,7 @@ C3DModelLoader::C3DModelLoader()
 	{
 		std::string extension = extensionchar;
 		extension = extension.substr( 2 ); // strip wildcard and dot
-		AddParser(extension,unitassparser); // register extension
+		parsers[extension] = unitassparser; // register extension
 		extensionchar = strtok( NULL, ";" );
 	}
 	delete charextensionlist;
@@ -90,12 +90,13 @@ inline int ModelExtToModelType(const std::string& ext) {
 	if (ext == "3do") { return MODELTYPE_3DO; }
 	if (ext == "s3o") { return MODELTYPE_S3O; }
 	if (ext == "obj") { return MODELTYPE_OBJ; }
-	return -1;
+	return MODELTYPE_ASS; // TODO: Verify this against Assimp extension list
 }
 inline S3DModelPiece* ModelTypeToModelPiece(int type) {
 	if (type == MODELTYPE_3DO) { return (new S3DOPiece()); }
 	if (type == MODELTYPE_S3O) { return (new SS3OPiece()); }
 	if (type == MODELTYPE_OBJ) { return (new SOBJPiece()); }
+	if (type == MODELTYPE_ASS) { return (new SAssPiece()); }
 	return NULL;
 }
 

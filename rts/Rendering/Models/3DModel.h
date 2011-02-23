@@ -23,7 +23,6 @@ struct S3DModelPiece;
 struct LocalModel;
 struct LocalModelPiece;
 struct aiScene;
-class LuaTable;
 
 typedef std::map<std::string, S3DModelPiece*> PieceMap;
 
@@ -112,11 +111,6 @@ struct S3DModel
 	std::string tex1;
 	std::string tex2;
 
-	int id;                 //! unsynced ID, starting with 1
-	int type;               //! MODELTYPE_*
-	int textureType;        //! FIXME: MAKE S3O ONLY (0 = 3DO, otherwise S3O or OBJ)
-
-	int numPieces;
 	float radius;
 	float height;
 
@@ -124,9 +118,10 @@ struct S3DModel
 	float3 maxs;
 	float3 relMidPos;
 
-	PieceMap pieces;   //! Lookup table for pieces by name
-	const aiScene* scene; //! For Assimp models. Contains imported data. NULL for s3o/3do.
-	S3DModelPiece* rootPiece;
+	int numPieces;
+	S3DModelPiece* rootPiece;  //! The piece at the base of the model hierarchy
+	PieceMap pieces;   			//! Lookup table for pieces by name
+	const aiScene* scene; 		//! For Assimp models. Contains imported data. NULL for s3o/3do.
 };
 
 
@@ -167,7 +162,8 @@ struct LocalModelPiece
 	CollisionVolume* GetCollisionVolume() { return colvol; }
 
 	float3 pos;
-	float3 rot; //! in radian
+	float3 rot; 	//! in radian
+	float3 scale;	//! not used yet
 
 	// TODO: add (visibility) maxradius!
 	bool visible;

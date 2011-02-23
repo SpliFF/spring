@@ -36,7 +36,6 @@ public:
 	void RotateZ(float rad);
 	void Rotate(float rad, const float3& axis); // axis is assumed to be normalized
 	void Translate(float x, float y, float z);
-	void Translate(const float3& pos);
 	void Scale(float scalex, float scaley, float scalez);
 	CMatrix44f Mul(const CMatrix44f& other) const;
 

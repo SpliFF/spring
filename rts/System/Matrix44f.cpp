@@ -200,6 +200,28 @@ void CMatrix44f::Translate(float x, float y, float z)
 }
 
 
+void CMatrix44f::Translate(const float3& pos)
+{
+	/*
+	CMatrix44f tm;
+
+	tm[12] = pos.x;
+	tm[13] = pos.y;
+	tm[14] = pos.z;
+
+	*this = Mul(tm);
+	*/
+
+	const float& x=pos.x;
+	const float& y=pos.y;
+	const float& z=pos.z;
+	m[12] += x*m[0] + y*m[4] + z*m[8];
+	m[13] += x*m[1] + y*m[5] + z*m[9];
+	m[14] += x*m[2] + y*m[6] + z*m[10];
+	m[15] += x*m[3] + y*m[7] + z*m[11];
+}
+
+
 void CMatrix44f::Scale(float scalex, float scaley, float scalez)
 {
   /* the function should be equivalent to doing this:

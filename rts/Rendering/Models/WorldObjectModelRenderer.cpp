@@ -13,6 +13,7 @@ IWorldObjectModelRenderer* IWorldObjectModelRenderer::GetInstance(int modelType)
 	switch (modelType) {
 		case MODELTYPE_3DO: { return (new WorldObjectModelRenderer3DO()); } break;
 		case MODELTYPE_S3O: { return (new WorldObjectModelRendererS3O()); } break;
+		case MODELTYPE_OBJ: { return (new WorldObjectModelRendererOBJ()); } break;
 		case MODELTYPE_ASS: { return (new WorldObjectModelRendererASS()); } break;
 		default: { return (new IWorldObjectModelRenderer(MODELTYPE_OTHER)); } break;
 	}
@@ -156,7 +157,7 @@ void IWorldObjectModelRenderer::DelProjectile(const CProjectile* p)
 
 void WorldObjectModelRenderer3DO::PushRenderState()
 {
-	#if (WORLDOBJECT_MODEL_RENDERER_DEBUG == 1)
+	#if (WOOBJOBJECT_MODEL_RENDERER_DEBUG == 1)
 	#endif
 
 	texturehandler3DO->Set3doAtlases();
@@ -183,7 +184,18 @@ void WorldObjectModelRendererS3O::PopRenderState()
 	#endif
 	// no-op
 }
-
+void WorldObjectModelRendererOBJ::PushRenderState()
+{
+    #if (WORLDOBJECT_MODEL_RENDERER_DEBUG == 1)
+    #endif
+    // WRITEME
+}
+void WorldObjectModelRendererOBJ::PopRenderState()
+{
+    #if (WORLDOBJECT_MODEL_RENDERER_DEBUG == 1)
+    #endif
+    // WRITEME
+}
 void WorldObjectModelRendererASS::PushRenderState()
 {
 	#if (WORLDOBJECT_MODEL_RENDERER_DEBUG == 1)

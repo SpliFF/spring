@@ -106,6 +106,13 @@ public:
 	void DrawModel(const CProjectile*);
 };
 
+class WorldObjectModelRendererOBJ: public IWorldObjectModelRenderer {
+public:
+    WorldObjectModelRendererOBJ(): IWorldObjectModelRenderer(MODELTYPE_OBJ) {}
+    void PushRenderState();
+    void PopRenderState();
+};
+
 class WorldObjectModelRendererASS: public IWorldObjectModelRenderer {
 public:
 	WorldObjectModelRendererASS(): IWorldObjectModelRenderer(MODELTYPE_ASS) {}

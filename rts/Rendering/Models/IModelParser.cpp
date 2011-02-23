@@ -12,6 +12,7 @@
 #include "3DModelLog.h"
 #include "3DOParser.h"
 #include "S3OParser.h"
+#include "OBJParser.h"
 #include "AssParser.h"
 #include "assimp.hpp"
 #include "Sim/Misc/CollisionVolume.h"
@@ -32,6 +33,7 @@ C3DModelLoader::C3DModelLoader()
 	// file-extension should be lowercase
 	parsers["3do"] = new C3DOParser();
 	parsers["s3o"] = new CS3OParser();
+	parsers["obj"] = new COBJParser(); // TODO Replace with Assimp
 
 	// assimp library
 	CAssParser* unitassparser = new CAssParser();

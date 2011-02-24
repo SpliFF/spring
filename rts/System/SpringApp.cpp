@@ -60,6 +60,7 @@
 #include "System/Platform/errorhandler.h"
 #include "System/Platform/CrashHandler.h"
 #include "System/Platform/Threading.h"
+#include "System/Platform/Watchdog.h"
 #include "System/Sound/ISound.h"
 
 #include "mmgr.h"
@@ -84,7 +85,6 @@
 
 using std::string;
 
-CGameController* activeController = NULL;
 ClientSetup* startsetup = NULL;
 
 COffscreenGLContext* SpringApp::ogc = NULL;
@@ -212,7 +212,7 @@ bool SpringApp::Initialize()
 	LuaOpenGL::Init();
 
 	// Sound
-	sound::ISound::Initialize();
+	ISound::Initialize();
 
 	SetProcessAffinity(configHandler->Get("SetCoreAffinity", 0));
 
@@ -992,12 +992,12 @@ int SpringApp::Sim()
 
 		while(gmlKeepRunning) {
 			if(!gmlMultiThreadSim) {
-				CrashHandler::ClearSimWDT(true);
+				Watchdog::ClearTimer("main",true);
 				while(!gmlMultiThreadSim && gmlKeepRunning)
 					SDL_Delay(200);
 			}
 			else if (activeController) {
-				CrashHandler::ClearSimWDT();
+				Watchdog::ClearTimer("main");
 				gmlProcessor->ExpandAuxQueue();
 
 				{
@@ -1036,7 +1036,7 @@ int SpringApp::Update()
 
 	int ret = 1;
 	if (activeController) {
-		CrashHandler::ClearDrawWDT();
+		Watchdog::ClearTimer("main");
 #if defined(USE_GML) && GML_ENABLE_SIM
 			if (gmlMultiThreadSim) {
 				if (!gs->frameNum) {
@@ -1140,7 +1140,7 @@ int SpringApp::Run(int argc, char *argv[])
 	if (!Initialize())
 		return -1;
 
-	CrashHandler::InstallHangHandler();
+	Watchdog::Install();
 
 #ifdef USE_GML
 	gmlProcessor = new gmlClientServer<void, int, CUnit*>;
@@ -1166,14 +1166,8 @@ int SpringApp::Run(int argc, char *argv[])
 			}
 		}
 
-		try {
-			if (!Update())
-				break;
-		} catch (content_error &e) {
-			// FIXME should this really be in here and not the crashhandler???
-			LogObject() << "Caught content exception: " << e.what() << "\n";
-			handleerror(NULL, e.what(), "Content error", MBF_OK | MBF_EXCL);
-		}
+		if (!Update())
+			break;
 	}
 
 	SaveWindowPosition();
@@ -1190,7 +1184,9 @@ int SpringApp::Run(int argc, char *argv[])
  */
 void SpringApp::Shutdown()
 {
-	gu->globalQuit = true;
+	if (gu) gu->globalQuit = true;
+
+#define DeleteAndNull(x) delete x; x = NULL;
 
 #ifdef USE_GML
 	if(gmlProcessor) {
@@ -1199,22 +1195,20 @@ void SpringApp::Shutdown()
 		while(!gmlProcessor->PumpAux())
 			boost::thread::yield();
 		if(GML_SHARE_LISTS)
-			delete ogc;
+			DeleteAndNull(ogc);
 #endif
-		delete gmlProcessor;
+		DeleteAndNull(gmlProcessor);
 	}
 #endif
 
-	CrashHandler::UninstallHangHandler();
-
-	delete pregame;
-	delete game;
-	delete gameServer;
-	delete gameSetup;
+	DeleteAndNull(pregame);
+	DeleteAndNull(game);
+	DeleteAndNull(gameServer);
+	DeleteAndNull(gameSetup);
 	CLoadScreen::DeleteInstance();
-	sound::ISound::Shutdown();
-	delete font;
-	delete smallFont;
+	ISound::Shutdown();
+	DeleteAndNull(font);
+	DeleteAndNull(smallFont);
 	CNamedTextures::Kill();
 	GLContext::Free();
 	ConfigHandler::Deallocate();
@@ -1229,9 +1223,11 @@ void SpringApp::Shutdown()
 #endif
 	SDL_Quit();
 
-	delete gs;
-	delete gu;
-	delete startsetup;
+	DeleteAndNull(gs);
+	DeleteAndNull(gu);
+	DeleteAndNull(startsetup);
+
+	Watchdog::Uninstall();
 
 #ifdef USE_MMGR
 	m_dumpMemoryReport();
@@ -1245,7 +1241,7 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 
 			GML_MSTMUTEX_LOCK(sim); // MainEventHandler
 
-			CrashHandler::ClearDrawWDT(true);
+			Watchdog::ClearTimer("main",true);
 			screenWidth = event.resize.w;
 			screenHeight = event.resize.h;
 #ifndef WIN32
@@ -1262,7 +1258,7 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 
 			GML_MSTMUTEX_LOCK(sim); // MainEventHandler
 
-			CrashHandler::ClearDrawWDT(true);
+			Watchdog::ClearTimer("main",true);
 			// re-initialize the stencil
 			glClearStencil(0);
 			glClear(GL_STENCIL_BUFFER_BIT); SDL_GL_SwapBuffers();
@@ -1276,12 +1272,12 @@ bool SpringApp::MainEventHandler(const SDL_Event& event)
 			break;
 		}
 		case SDL_ACTIVEEVENT: {
-			CrashHandler::ClearDrawWDT(true);
+			Watchdog::ClearTimer("main",true);
 
 			if (event.active.state & (SDL_APPACTIVE | (globalRendering->fullScreen ? SDL_APPINPUTFOCUS : 0))) {
 				globalRendering->active = !!event.active.gain;
-				if (sound::ISound::IsInitialized()) {
-					gSound->Iconified(!event.active.gain);
+				if (ISound::IsInitialized()) {
+					sound->Iconified(!event.active.gain);
 				}
 			}
 

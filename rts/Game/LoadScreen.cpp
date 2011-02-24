@@ -27,9 +27,9 @@
 #include "System/LogOutput.h"
 #include "System/NetProtocol.h"
 #include "System/FileSystem/FileHandler.h"
-#include "System/Platform/CrashHandler.h"
+#include "System/Platform/Watchdog.h"
 #include "System/Sound/ISound.h"
-#include "System/Sound/SoundChannels.h"
+#include "System/Sound/IMusicChannel.h"
 
 
 CLoadScreen* CLoadScreen::singleton = NULL;
@@ -60,12 +60,9 @@ void CLoadScreen::Init()
 	//! and gu->myPlayerNum has to be set.
 	skirmishAIHandler.LoadPreGame();
 
-	//! Increase hang detection trigger threshold, to prevent false positives during load
-	CrashHandler::GameLoading(true);
-
 	mt_loading = configHandler->Get("LoadingMT", true);
 
-	//! Create a Thread that pings the host/server, so it knows that this client is still alive
+	//! Create a thread during the loading that pings the host/server, so it knows that this client is still alive/loading
 	netHeartbeatThread = new boost::thread(boost::bind<void, CNetProtocol, CNetProtocol*>(&CNetProtocol::UpdateLoop, net));
 
 	game = new CGame(mapName, modName, saveFile);
@@ -83,7 +80,7 @@ void CLoadScreen::Init()
 
 		const std::string mapStartMusic(mapInfo->GetStringValue("Startmusic"));
 		if (!mapStartMusic.empty())
-			sound::Channels::BGMusic.Play(mapStartMusic);
+			Channels::BGMusic.Play(mapStartMusic);
 	}
 
 	try {
@@ -110,15 +107,13 @@ CLoadScreen::~CLoadScreen()
 {
 	delete gameLoadThread; gameLoadThread = NULL;
 
-	net->loading = false;
-	netHeartbeatThread->join();
+	if (net)
+		net->loading = false;
+	if (netHeartbeatThread)
+		netHeartbeatThread->join();
 	delete netHeartbeatThread; netHeartbeatThread = NULL;
 
-	UnloadStartPicture();
-
-	CrashHandler::ClearDrawWDT();
-	//! Set hang detection trigger threshold back to normal
-	CrashHandler::GameLoading(false);
+	Watchdog::ClearTimer();
 
 	if (!gu->globalQuit) {
 		//! sending your playername to the server indicates that you are finished loading
@@ -131,6 +126,8 @@ CLoadScreen::~CLoadScreen()
 
 		activeController = game;
 	}
+
+	UnloadStartPicture();
 
 	if (activeController == this)
 		activeController = NULL;
@@ -300,7 +297,7 @@ bool CLoadScreen::Draw()
 
 void CLoadScreen::SetLoadMessage(const std::string& text, bool replace_lastline)
 {
-	CrashHandler::ClearDrawWDT();
+	Watchdog::ClearTimer("main");
 
 	boost::recursive_mutex::scoped_lock lck(mutex);
 

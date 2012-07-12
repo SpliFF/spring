@@ -68,6 +68,15 @@ CEFX::CEFX(ALCdevice* device)
 		return;
 	}
 
+	//! Disable EFX on OpenAL Software renderer because it segfaults and causes stutter
+	LOG("  Renderer:       %s", (const char*)alGetString(AL_RENDERER));
+	const std::string RENDERER_OPENAL_SOFT = "OpenAL Soft";
+	if (alGetString(AL_RENDERER) == RENDERER_OPENAL_SOFT) {
+		LOG("  EFX disabled due to software OpenAL rendering (Buggy EAX reverb)");
+		supported = false;
+		return;
+	}
+
 	//! clear log
 	alGetError() ;
 

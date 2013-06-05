@@ -12,6 +12,7 @@
 #include "LuaBitOps.h"
 #include "LuaUtils.h"
 #include "LuaZip.h"
+#include "LuaPack.h"
 #include "Game/GlobalUnsynced.h"
 #include "Game/Player.h"
 #include "Game/PlayerHandler.h"
@@ -2875,6 +2876,11 @@ bool CLuaHandle::AddBasicCalls(lua_State *L)
 	// extra math utilities
 	lua_getglobal(L, "math");
 	LuaBitOps::PushEntries(L);
+	lua_pop(L, 1);
+
+	// extra string utilities
+	lua_getglobal(L, "string");
+	LuaPack::PushEntries(L);
 	lua_pop(L, 1);
 
 	return true;

@@ -48,6 +48,7 @@
 #include "System/Log/ILog.h"
 #include "System/FileSystem/FileHandler.h"
 #include "System/FileSystem/FileSystem.h"
+#include "lib/luasocket/src/luasocket.h"
 
 
 static const LuaHashString unsyncedStr("UNSYNCED");
@@ -125,6 +126,9 @@ void CLuaHandleSynced::Init(const string& syncedFile,
 	//LUA_OPEN_LIB(L, luaopen_package);
 	//LUA_OPEN_LIB(L, luaopen_debug);
 
+	//initialize luasocket
+	InitLuaSocket(L);
+
 	// delete some dangerous functions
 	lua_pushnil(L); lua_setglobal(L, "dofile");
 	lua_pushnil(L); lua_setglobal(L, "loadfile");
@@ -175,6 +179,21 @@ void CLuaHandleSynced::Init(const string& syncedFile,
 	END_ITERATE_LUA_STATES();
 }
 
+void CLuaHandleSynced::InitLuaSocket(lua_State* L) {
+	std::string code;
+	std::string filename="socket.lua";
+	CFileHandler f(filename);
+
+    LOG("Initialising LuaRules LuaSocket");
+
+	LUA_OPEN_LIB(L,luaopen_socket_core);
+
+	if (f.LoadStringData(code)){
+		LoadCode(L, code.c_str(), filename.c_str());
+	} else {
+		LOG_L(L_ERROR, "Error loading %s", filename.c_str());
+	}
+}
 
 bool CLuaHandleSynced::SetupSynced(lua_State *L, const string& code, const string& filename)
 {

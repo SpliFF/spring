@@ -83,6 +83,8 @@ class CLuaHandleSynced : public CLuaHandle
 		map<string, string> textCommands; // name, help
 
 	private: // call-outs
+        void InitLuaSocket(lua_State* L);
+
 		static int SyncedRandom(lua_State* L);
 
 		static int LoadStringData(lua_State* L);
